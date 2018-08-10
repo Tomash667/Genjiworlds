@@ -10,38 +10,41 @@ namespace Genjiworlds2
     {
         private static string[] pre = new string[]
         {
-            "to",
-            "do",
-            "ce",
-            "mar",
             "ad",
-            "sła",
+            "ce",
+            "do",
+            "kon",
+            "mar",
+            "mi",
             "prze",
-            "kon"
+            "sła",
+            "to"
         };
 
         private static string[] mid = new string[]
         {
+            "ko",
             "ma",
             "mek",
             "mi",
-            "za",
+            "my",
             "wo",
-            "my"
+            "za"
         };
 
         private static string[] end = new string[]
         {
-            "szu",
-            "nik",
-            "ry",
-            "tin",
-            "rian",
-            "wek",
+            "łaj",
             "mir",
             "mek",
+            "nik",
+            "rad",
+            "rian",
+            "ry",
             "sław",
-            "rad"
+            "szu",
+            "tin",
+            "wek"
         };
 
         public static string GetName()

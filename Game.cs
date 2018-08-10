@@ -11,29 +11,86 @@ namespace Genjiworlds2
         int turn;
         List<Hero> heroes = new List<Hero>();
         List<Hero> to_remove = new List<Hero>();
+        Hero watched;
+        bool quit, first_turn;
 
         public void Run()
         {
+            quit = false;
             Init();
-            while(true)
+            while(!quit)
             {
                 Console.Clear();
-                Hero oldest = heroes.MaxBy(x => x.age);
-                string oldest_str = "";
-                if (oldest != null)
-                    oldest_str = $", oldest {oldest.name} (age {oldest.age})";
-                Console.WriteLine($"Turn {turn}, heroes {heroes.Count}{oldest_str}");
-                Update();
+                if (first_turn)
+                {
+                    StringBuilder sb = new StringBuilder($"Turn {turn}, heroes: ");
+                    foreach (Hero h in heroes)
+                        sb.Append($"{h.name}, ");
+                    sb.Remove(sb.Length - 2, 2);
+                    sb.Append(".");
+                    Console.WriteLine(sb);
+                }
+                else
+                {
+                    if (watched == null)
+                    {
+                        Hero oldest = heroes.MaxBy(x => x.age);
+                        string oldest_str = "";
+                        if (oldest != null)
+                            oldest_str = $", oldest {oldest.name} (age {oldest.age})";
+                        Console.WriteLine($"Turn {turn}, heroes {heroes.Count}{oldest_str}");
+                    }
+                    else
+                        Console.WriteLine($"Turn {turn}, hero {watched.name} (hp {watched.hp}, age {watched.age})");
+                    Update();
+                }
+                ParseCommand();
                 ++turn;
-                var key = Console.ReadKey();
-                if (key.KeyChar == 'q')
-                    break;
+            }
+        }
+
+        void ParseCommand()
+        {
+            while (true)
+            {
+                Console.Write("> ");
+                char c = Console.ReadKey().KeyChar;
+                switch (c)
+                {
+                    case 'q':
+                        quit = true;
+                        return;
+                    case 'h':
+                        Console.WriteLine("h-help, r-restart, w-watch hero, q-quit");
+                        break;
+                    case 'r':
+                        Init();
+                        return;
+                    case 'w':
+                        Console.Write("Hero name to watch: ");
+                        string name = Console.ReadLine();
+                        if (name == "null")
+                            watched = null;
+                        else
+                        {
+                            watched = heroes.FirstOrDefault(x => x.name == name);
+                            if (watched == null)
+                                Console.WriteLine($"No hero with name {name}.");
+                            else
+                                Console.WriteLine($"Watching {name}.");
+                        }
+                        break;
+                    default:
+                        return;
+                }
             }
         }
 
         void Init()
         {
             turn = 1;
+            first_turn = true;
+            watched = null;
             heroes.Clear();
             int count = Utils.Random(10, 12);
             for(int i=0; i<count; ++i)
