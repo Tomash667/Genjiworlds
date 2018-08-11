@@ -1,0 +1,5 @@
+﻿+ walka z orkiem
++ szansa % na opuszczenie podziemi
++ czy chce opuścić zależy od hp
++ testy
++ logowanie watched
