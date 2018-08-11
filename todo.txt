@@ -1,5 +1,6 @@
-﻿+ walka z orkiem
-+ szansa % na opuszczenie podziemi
-+ czy chce opuścić zależy od hp
-+ testy
-+ logowanie watched
+﻿v2:
++ hero advancement
+
+v3:
++ harder enemies
++ god mode - add gold

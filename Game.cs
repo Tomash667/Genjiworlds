@@ -1,19 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
-namespace Genjiworlds2
+namespace Genjiworlds
 {
     class Game
     {
-        int turn;
+        int turn, next_id;
         List<Hero> heroes = new List<Hero>();
         List<Hero> to_remove = new List<Hero>();
         Hero watched;
         bool quit, first_turn;
         static readonly int[] spawn_rate = { 20, 10, 5 };
+        static readonly byte[] save_sign = { (byte)'G', (byte)'E', (byte)'N', (byte)'J' };
+        const byte version = 2;
+        const byte file_end_sign = 0xE3;
 
         public void Run()
         {
@@ -47,7 +50,7 @@ namespace Genjiworlds2
                         Console.WriteLine($"Turn {turn}, heroes {heroes.Count}{oldest_str}{winner_str}");
                     }
                     else
-                        Console.WriteLine($"Turn {turn}, hero {watched.name} - inside {(watched.inside_city ? "city" : "dungeon")} (hp {watched.hp}, age {watched.age}, kills {watched.kills})");
+                        Console.WriteLine($"Turn {turn}, hero {watched.name} - inside {(watched.inside_city ? "city" : "dungeon")} (hp {watched.hp}/{Hero.max_hp}, age {watched.age}, kills {watched.kills})");
                     Update();
                 }
                 ParseCommand();
@@ -68,23 +71,72 @@ namespace Genjiworlds2
                         quit = true;
                         return;
                     case 'h':
-                        Console.WriteLine("h-help, r-restart, w-watch hero, q-quit");
+                        Console.WriteLine("h-help, r-restart, w-watch hero, v-view hero, s-save, l-load, q-quit");
                         break;
                     case 'r':
                         Init();
                         return;
                     case 'w':
-                        Console.Write("Hero name to watch: ");
-                        string name = Console.ReadLine();
-                        if (name == "null")
-                            watched = null;
-                        else
                         {
-                            watched = heroes.FirstOrDefault(x => x.name == name);
-                            if (watched == null)
+                            Console.Write("Hero name to watch: ");
+                            string name = Console.ReadLine();
+                            if (name == "null")
+                                watched = null;
+                            else
+                            {
+                                watched = heroes.FirstOrDefault(x => x.name == name);
+                                if (watched == null)
+                                    Console.WriteLine($"No hero with name {name}.");
+                                else
+                                    Console.WriteLine($"Watching {name}.");
+                            }
+                        }
+                        break;
+                    case 'v':
+                        if (watched == null)
+                        {
+                            Console.Write("Hero name: ");
+                            string name = Console.ReadLine();
+                            Hero h = heroes.FirstOrDefault(x => x.name == name);
+                            if (h == null)
                                 Console.WriteLine($"No hero with name {name}.");
                             else
-                                Console.WriteLine($"Watching {name}.");
+                                h.ShowInfo();
+                        }
+                        else
+                            watched.ShowInfo();
+                        break;
+                    case 's':
+                        Save();
+                        break;
+                    case 'l':
+                        while (true)
+                        {
+                            LoadResult result = Load();
+                            if (result == LoadResult.Ok)
+                                return;
+                            else if (result == LoadResult.NoFile)
+                            {
+                                Console.WriteLine("No save file.");
+                                break;
+                            }
+                            else
+                            {
+                                Console.WriteLine("What to do? (r-retry, n-new game, q-quit)");
+                                c = Utils.ReadKey("rnq");
+                                if (c == 'r')
+                                    continue;
+                                else if(c == 'q')
+                                {
+                                    quit = true;
+                                    break;
+                                }
+                                else
+                                {
+                                    Init();
+                                    return;
+                                }
+                            }
                         }
                         break;
                     default:
@@ -95,6 +147,7 @@ namespace Genjiworlds2
 
         void Init()
         {
+            next_id = 0;
             turn = 1;
             first_turn = true;
             watched = null;
@@ -102,7 +155,7 @@ namespace Genjiworlds2
             int count = Utils.Random(10, 12);
             for(int i=0; i<count; ++i)
             {
-                Hero h = new Hero();
+                Hero h = new Hero(next_id++);
                 heroes.Add(h);
             }
         }
@@ -114,9 +167,13 @@ namespace Genjiworlds2
                 ++h.age;
                 if(h.inside_city)
                 {
-                    if(h.ShouldRest())
+                    if(h.BuyItems(watched == null || watched == h))
                     {
-                        h.hp = Math.Min(10, h.hp + Utils.Random(2, 3));
+                        // bought something
+                    }
+                    else if(h.ShouldRest())
+                    {
+                        h.hp = Math.Min(Hero.max_hp, h.hp + Utils.Random(2, 3));
                         if(watched == null || watched == h)
                             Console.WriteLine($"{h.name} rests inside city.");
                     }
@@ -129,6 +186,16 @@ namespace Genjiworlds2
                 }
                 else
                 {
+                    if(h.potions > 0 && h.ShouldDrinkPotion())
+                    {
+                        int heal = Utils.Random(2, 5);
+                        if (watched == null || watched == h)
+                            Console.WriteLine($"{h.name} drinks potion and is healed for {heal} points.");
+                        h.hp = Math.Min(Hero.max_hp, h.hp + heal);
+                        --h.potions;
+                        continue;
+                    }
+
                     bool exit = h.ShouldExitDungeon();
                     if(exit)
                     {
@@ -144,6 +211,7 @@ namespace Genjiworlds2
                                 Console.WriteLine($"{h.name} searches for exit from dungeon but fails.");
                         }
                     }
+
                     int e = Utils.Random(0, 3);
                     if (e == 0)
                     {
@@ -152,7 +220,9 @@ namespace Genjiworlds2
                     }
                     else if (e == 1)
                     {
-                        int dmg = Utils.Random(2, 8);
+                        int dmg = Utils.Random(2, 8) - h.armor;
+                        if (dmg < 1)
+                            dmg = 1;
                         h.hp -= dmg;
                         if(h.hp <= 0)
                         {
@@ -178,12 +248,59 @@ namespace Genjiworlds2
                                 str = "got killed";
                             Console.WriteLine($"{h.name} was attacked by orc and {str}.");
                         }
+                        if(win)
+                        {
+                            int reward = Utils.Random(20, 40);
+                            h.gold += reward;
+                            if (watched == null || watched == h)
+                                Console.WriteLine($"{h.name} takes {reward} gold from corpse.");
+                        }
                     }
                     else
                     {
-                        h.hp = Math.Min(10, h.hp + 5);
+                        e = Utils.Random(0, 4);
+                        string what;
+                        if ((e == 1 && h.weapon == Item.max_item_level)
+                            || (e == 2 && h.armor == Item.max_item_level)
+                            || (e == 3 && h.potions == Hero.max_potions && h.hp == Hero.max_hp))
+                            e = 0;
+                        switch (e)
+                        {
+                            default:
+                            case 0:
+                                {
+                                    int count = Utils.Random(10, 20);
+                                    what = $"{count} gold pile";
+                                    h.gold += count;
+                                }
+                                break;
+                            case 1:
+                                h.weapon++;
+                                what = Item.weapon_names[h.weapon];
+                                break;
+                            case 2:
+                                h.armor++;
+                                what = $"{Item.armor_names[h.armor]} armor";
+                                break;
+                            case 3:
+                                h.potions += 2;
+                                if(h.potions > Hero.max_potions)
+                                {
+                                    h.hp = Math.Min(Hero.max_hp, Utils.Random(2, 5) * (h.potions - Hero.max_potions));
+                                    h.potions = Hero.max_potions;
+                                }
+                                what = "potions";
+                                break;
+                            case 4:
+                                {
+                                    int count = Utils.Random(50, 100);
+                                    what = $"{count} gold treasure";
+                                    h.gold += count;
+                                }
+                                break;
+                        }
                         if (watched == null || watched == h)
-                            Console.WriteLine($"{h.name} finds healing potion.");
+                            Console.WriteLine($"{h.name} finds {what}.");
                     }
                 }
             }
@@ -199,7 +316,7 @@ namespace Genjiworlds2
             {
                 if (heroes.Count < rate && Utils.Rand() % 2 == 0)
                 {
-                    Hero h = new Hero();
+                    Hero h = new Hero(next_id++);
                     if(watched == null)
                         Console.WriteLine($"{h.name} joins the city.");
                     heroes.Add(h);
@@ -219,7 +336,7 @@ namespace Genjiworlds2
                 {
                     if(Utils.Rand() % 3 != 0)
                     {
-                        int dmg = Utils.Random(1, 4);
+                        int dmg = Utils.Random(1, 4) + h.weapon;
                         enemy_hp -= dmg;
                         if(enemy_hp <= 0)
                         {
@@ -245,7 +362,9 @@ namespace Genjiworlds2
                 {
                     if (Utils.Rand() % 3 != 0)
                     {
-                        int dmg = Utils.Random(1, 4);
+                        int dmg = Utils.Random(1, 4) - h.armor;
+                        if (dmg < 1)
+                            dmg = 1;
                         h.hp -= dmg;
                         if (h.hp <= 0)
                         {
@@ -267,6 +386,81 @@ namespace Genjiworlds2
                     }
                     hero_turn = true;
                 }
+            }
+        }
+
+        void Save()
+        {
+            try
+            {
+                using (FileStream fs = new FileStream("save", FileMode.Create))
+                using(BinaryWriter f = new BinaryWriter(fs))
+                {
+                    f.Write(save_sign);
+                    f.Write(version);
+                    f.Write(turn);
+                    f.Write(next_id);
+                    f.Write(heroes.Count);
+                    foreach (Hero h in heroes)
+                        h.Save(f);
+                    f.Write(watched?.id ?? -1);
+                    f.Write(file_end_sign);
+                }
+                Console.WriteLine("Save completed.");
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine($"Save failed: {e}");
+            }
+        }
+
+        enum LoadResult
+        {
+            NoFile,
+            Failed,
+            Ok
+        }
+
+        LoadResult Load()
+        {
+            try
+            {
+                using (FileStream fs = new FileStream("save", FileMode.Open))
+                using (BinaryReader f = new BinaryReader(fs))
+                {
+                    byte[] sign = f.ReadBytes(4);
+                    if (!sign.SequenceEqual(save_sign))
+                        throw new Exception("Invalid file signature.");
+                    byte ver = f.ReadByte();
+                    if (ver != version)
+                        throw new Exception($"Unsupported version {ver} (current {version}).");
+                    turn = f.ReadInt32();
+                    next_id = f.ReadInt32();
+                    int count = f.ReadInt32();
+                    heroes.Clear();
+                    for(int i=0; i<count; ++i)
+                    {
+                        Hero h = new Hero();
+                        h.Load(f);
+                        heroes.Add(h);
+                    }
+                    int watched_id = f.ReadInt32();
+                    if (watched_id == -1)
+                        watched = null;
+                    else
+                        watched = heroes.Single(x => x.id == watched_id);
+                    first_turn = true;
+                    return LoadResult.Ok;
+                }
+            }
+            catch(FileNotFoundException)
+            {
+                return LoadResult.NoFile;
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine($"Load failed: {e}");
+                return LoadResult.Failed;
             }
         }
     }

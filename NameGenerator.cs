@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text;
 
-namespace Genjiworlds2
+namespace Genjiworlds
 {
     public static class NameGenerator
     {
@@ -14,8 +10,10 @@ namespace Genjiworlds2
             "ce",
             "do",
             "kon",
+            "ma",
             "mar",
             "mi",
+            "pa",
             "pio",
             "prze",
             "sła",
@@ -29,6 +27,7 @@ namespace Genjiworlds2
             "mek",
             "mi",
             "my",
+            "te",
             "wo",
             "za"
         };
@@ -45,7 +44,10 @@ namespace Genjiworlds2
             "sław",
             "szu",
             "tin",
+            "tryk",
             "trek",
+            "usz",
+            "weł",
             "wek"
         };
 
