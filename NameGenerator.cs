@@ -16,6 +16,7 @@ namespace Genjiworlds2
             "kon",
             "mar",
             "mi",
+            "pio",
             "prze",
             "sła",
             "to"
@@ -44,6 +45,7 @@ namespace Genjiworlds2
             "sław",
             "szu",
             "tin",
+            "trek",
             "wek"
         };
 
