@@ -17,37 +17,50 @@ namespace Genjiworlds
         public int potions;
         public int age, kills;
         public bool inside_city;
+        public bool controlled;
 
         public const int max_potions = 5;
         private static List<string> bought_items = new List<string>();
+
+        public string Name
+        {
+            get { return controlled ? "You" : name; }
+        }
+        public string NameMid
+        {
+            get { return controlled ? "you" : name; }
+        }
 
         public Hero()
         {
         }
 
-        public Hero(int id)
+        public Hero(int id, bool custom = false)
         {
             this.id = id;
-            name = NameGenerator.GetName();
             level = 1;
             exp_need = 100;
-            // start with 1 point in single attribute
-            switch (Utils.Rand() % 3)
+            gold = Utils.Random(30, 60);
+            if (!custom)
             {
-                case 0:
-                    str = 1;
-                    break;
-                case 1:
-                    dex = 1;
-                    break;
-                case 2:
-                    end = 1;
-                    break;
+                name = NameGenerator.GetName();
+                // start with 1 point in single attribute
+                switch (Utils.Rand() % 3)
+                {
+                    case 0:
+                        str = 1;
+                        break;
+                    case 1:
+                        dex = 1;
+                        break;
+                    case 2:
+                        end = 1;
+                        break;
+                }
+                BuyItems(false);
             }
             inside_city = true;
             hp = hpmax = CalculateMaxHp();
-            gold = Utils.Random(30, 60);
-            BuyItems(false);
         }
 
         float Hpp { get { return ((float)hp) / hpmax; } }
@@ -210,6 +223,13 @@ namespace Genjiworlds
             return 9 + level + (end + 1) / 2 * level;
         }
 
+        private void RecalculateHp()
+        {
+            int prevhp = hpmax;
+            hpmax = CalculateMaxHp();
+            hp += hpmax - prevhp;
+        }
+
         public void AddExp(int e, bool show)
         {
             exp += e;
@@ -218,23 +238,45 @@ namespace Genjiworlds
             ++level;
             exp -= exp_need;
             exp_need += 100;
-            switch (Utils.Rand() % 3)
+            if (show)
+                Console.WriteLine($"{Name} gained {level} level.");
+            if (controlled)
+                PickAttribute();
+            else
             {
-                case 0:
+                switch (Utils.Rand() % 3)
+                {
+                    case 0:
+                        ++str;
+                        break;
+                    case 1:
+                        ++dex;
+                        break;
+                    case 2:
+                        ++end;
+                        break;
+                }
+            }
+            RecalculateHp();
+        }
+
+        public void PickAttribute()
+        {
+            Console.WriteLine("Pick attribute (str, dex, end): ");
+            char c = Utils.ReadKey("sde");
+            switch(c)
+            {
+                case 's':
                     ++str;
                     break;
-                case 1:
+                case 'd':
                     ++dex;
                     break;
-                case 2:
+                case 'e':
                     ++end;
                     break;
             }
-            int prevhp = hpmax;
-            hpmax = CalculateMaxHp();
-            hp += hpmax - prevhp;
-            if (show)
-                Console.WriteLine($"{name} gained {level} level.");
+            RecalculateHp();
         }
     }
 }

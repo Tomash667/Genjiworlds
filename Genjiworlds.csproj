@@ -59,11 +59,14 @@
   <ItemGroup>
     <Compile Include="Extensions.cs" />
     <Compile Include="Game.cs" />
-    <Compile Include="Hero.cs" />
+    <Compile Include="Unit\AiController.cs" />
+    <Compile Include="Unit\Hero.cs" />
     <Compile Include="Item.cs" />
+    <Compile Include="Unit\IUnitController.cs" />
     <Compile Include="NameGenerator.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Unit\PlayerController.cs" />
     <Compile Include="Utils.cs" />
   </ItemGroup>
   <ItemGroup>

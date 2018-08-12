@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Genjiworlds.Unit;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,16 +13,20 @@ namespace Genjiworlds
         List<Hero> heroes = new List<Hero>();
         List<Hero> to_remove = new List<Hero>();
         Hero watched;
-        bool quit, first_turn;
+        bool quit, first_turn, controlled, controlled_quit;
         static readonly int[] spawn_rate = { 20, 10, 5 };
         static readonly byte[] save_sign = { (byte)'G', (byte)'E', (byte)'N', (byte)'J' };
-        const byte version = 2;
+        const byte version = 3;
         const byte file_end_sign = 0xE3;
+        PlayerController pc = new PlayerController();
+        AiController ai = new AiController();
 
         public void Run()
         {
             Console.Title = $"Genjiworlds v{version}";
             quit = false;
+            pc.game = this;
+
             Init();
             while(!quit)
             {
@@ -50,20 +55,21 @@ namespace Genjiworlds
                             winner_str = $", winner {winner.name} (kills {winner.kills})";
                         Console.WriteLine($"Turn {turn}, heroes {heroes.Count}{oldest_str}{winner_str}");
                     }
-                    else
+                    else if(!controlled)
                     {
                         Console.WriteLine($"Turn {turn}, hero {watched.name} - inside {(watched.inside_city ? "city" : "dungeon")}\n"
                             + $"(level:{watched.level}, exp:{watched.exp}/{watched.exp_need}, hp:{watched.hp}/{watched.hpmax})");
                     }
                     Update();
                 }
-                ParseCommand();
+                if (!controlled)
+                    ParseCommand();
                 if(!first_turn)
                     ++turn;
             }
         }
 
-        void ParseCommand()
+        public bool ParseCommand()
         {
             while (true)
             {
@@ -73,19 +79,31 @@ namespace Genjiworlds
                 {
                     case 'q':
                         quit = true;
-                        return;
+                        return true;
                     case 'h':
-                        Console.WriteLine("h-help, r-restart, w-watch hero, v-view hero, s-save, l-load, q-quit");
-                        break;
+                        Console.WriteLine("h-help, c-create hero, t-take control, w-watch hero, v-view hero, s-save, l-load, r-restart, q-quit");
+                        return false;
                     case 'r':
+                        if (controlled)
+                            controlled_quit = true;
                         Init();
-                        return;
+                        return true;
                     case 'w':
+                    case 't':
                         {
-                            Console.Write("Hero name to watch: ");
+                            bool watch = c == 'w';
+                            Console.Write($"Hero name to {(watch?"watch":"controll")}: ");
                             string name = Console.ReadLine();
                             if (name == "null")
-                                watched = null;
+                            {
+                                if (watched != null)
+                                {
+                                    watched.controlled = false;
+                                    watched = null;
+                                }
+                                if (controlled)
+                                    return true;
+                            }
                             else
                             {
                                 Hero h = heroes.FirstOrDefault(x => x.name == name);
@@ -93,8 +111,13 @@ namespace Genjiworlds
                                     Console.WriteLine($"No hero with name {name}.");
                                 else
                                 {
-                                    watched = h;
-                                    Console.WriteLine($"Watching {name}.");
+                                    bool prev_controlled = controlled;
+                                    if (watched != null)
+                                        watched.controlled = false;
+                                    controlled = false;
+                                    Console.WriteLine($"{(watch ? "Watching" : "Controlling")} {name}.");
+                                    if (prev_controlled)
+                                        return true;
                                 }
                             }
                         }
@@ -117,11 +140,13 @@ namespace Genjiworlds
                         Save();
                         break;
                     case 'l':
+                        if (controlled)
+                            controlled_quit = true;
                         while (true)
                         {
                             LoadResult result = Load();
                             if (result == LoadResult.Ok)
-                                return;
+                                return true;
                             else if (result == LoadResult.NoFile)
                             {
                                 Console.WriteLine("No save file.");
@@ -141,13 +166,33 @@ namespace Genjiworlds
                                 else
                                 {
                                     Init();
-                                    return;
+                                    return true;
                                 }
                             }
                         }
                         break;
+                    case 'c':
+                        {
+                            if (controlled)
+                                controlled_quit = true;
+                            Console.Write("Hero name: ");
+                            string name = Console.ReadLine();
+                            Hero h = new Hero(next_id++, true)
+                            {
+                                name = name,
+                                controlled = true
+                            };
+                            h.PickAttribute();
+                            heroes.Add(h);
+                            watched = h;
+                            controlled = true;
+                            Console.WriteLine($"Controlling {name}.");
+                            if (controlled_quit)
+                                return true;
+                        }
+                        break;
                     default:
-                        return;
+                        return false;
                 }
             }
         }
@@ -158,6 +203,7 @@ namespace Genjiworlds
             turn = 1;
             first_turn = true;
             watched = null;
+            controlled = false;
             heroes.Clear();
             int count = Utils.Random(10, 12);
             for(int i=0; i<count; ++i)
@@ -172,155 +218,78 @@ namespace Genjiworlds
             foreach(Hero h in heroes)
             {
                 ++h.age;
-                if(h.inside_city)
+                bool notify = watched == null || watched == h;
+
+                Order order = Order.None;
+                if(controlled && h == watched)
                 {
-                    if(h.BuyItems(watched == null || watched == h))
+                    order = pc.Think(h);
+                    if(controlled_quit)
                     {
-                        // bought something
-                    }
-                    else if(h.ShouldRest())
-                    {
-                        int healed = (int)(Utils.Random(0.15f, 0.2f) * h.hpmax);
-                        h.hp = Math.Min(h.hpmax, h.hp + healed);
-                        if(watched == null || watched == h)
-                            Console.WriteLine($"{h.name} rests inside city.");
-                    }
-                    else
-                    {
-                        if (watched == null || watched == h)
-                            Console.WriteLine($"{h.name} goes into dungeon.");
-                        h.inside_city = false;
+                        controlled_quit = false;
+                        return;
                     }
                 }
-                else
-                {
-                    if(h.potions > 0 && h.ShouldDrinkPotion())
-                    {
-                        int heal = Utils.Random(2, 5) + h.level / 2;
-                        if (watched == null || watched == h)
-                            Console.WriteLine($"{h.name} drinks potion and is healed for {heal} points.");
-                        h.hp = Math.Min(h.hpmax, h.hp + heal);
-                        --h.potions;
-                        continue;
-                    }
 
-                    bool exit = h.ShouldExitDungeon();
-                    if(exit)
-                    {
-                        if(Utils.Rand() % 2 == 0)
+                if (order == Order.None)
+                {
+                    ai.notify = notify;
+                    order = ai.Think(h);
+                }
+
+                switch(order)
+                {
+                    case Order.Buy:
+                        break;
+                    case Order.Rest:
                         {
-                            if (watched == null || watched == h)
-                                Console.WriteLine($"{h.name} returns to city.");
+                            int healed = (int)(Utils.Random(0.15f, 0.25f) * h.hpmax);
+                            h.hp = Math.Min(h.hpmax, h.hp + healed);
+                            if (notify)
+                                Console.WriteLine($"{h.Name} rests inside city.");
+                        }
+                        break;
+                    case Order.GotoDungeon:
+                        if (notify)
+                            Console.WriteLine($"{h.Name} goes into dungeon.");
+                        h.inside_city = false;
+                        break;
+                    case Order.UsePotion:
+                        {
+                            int heal = Utils.Random(2, 5) + h.level / 2;
+                            if (notify)
+                                Console.WriteLine($"{h.Name} drinked potion and was healed for {heal} points.");
+                            h.hp = Math.Min(h.hpmax, h.hp + heal);
+                            --h.potions;
+                        }
+                        break;
+                    case Order.GotoCity:
+                        if (Utils.Rand() % 2 == 0)
+                        {
+                            if (notify)
+                                Console.WriteLine($"{h.Name} returns to city.");
                             h.inside_city = true;
                         }
                         else
                         {
-                            if (watched == null || watched == h)
-                                Console.WriteLine($"{h.name} searches for exit from dungeon but fails.");
+                            if (notify)
+                                Console.WriteLine($"{h.Name} searches for exit from dungeon but fails.");
+                            ExploreDungeon(h, true, notify);
                         }
-                    }
-
-                    int e = Utils.Random(0, 3);
-                    if (e == 0)
-                    {
-                        if(!exit && (watched == null || watched == h))
-                            Console.WriteLine($"{h.name} explores dungeon.");
-                        h.AddExp(1, watched == null || watched == h);
-                    }
-                    else if (e == 1)
-                    {
-                        int dmg = Utils.Random(2, 8) - h.armor;
-                        if (dmg < 1)
-                            dmg = 1;
-                        h.hp -= dmg;
-                        if(h.hp <= 0)
-                        {
-                            to_remove.Add(h);
-                            if (watched == null || watched == h)
-                                Console.WriteLine($"{h.name} was killed by a trap.");
-                        }
-                        else
-                        {
-                            if (watched == null || watched == h)
-                                Console.WriteLine($"{h.name} takes {dmg} damage from trap.");
-                            h.AddExp(5, watched == null || watched == h);
-                        }
-                    }
-                    else if (e == 2)
-                    {
-                        bool win = Combat(h, watched == h);
-                        if (watched == null)
-                        {
-                            string str;
-                            if (Utils.Rand() % 2 == 0)
-                                str = "wins combat";
-                            else
-                                str = "got killed";
-                            Console.WriteLine($"{h.name} was attacked by orc and {str}.");
-                        }
-                        if(win)
-                        {
-                            int reward = Utils.Random(20, 40);
-                            h.gold += reward;
-                            if (watched == null || watched == h)
-                                Console.WriteLine($"{h.name} takes {reward} gold from corpse.");
-                            h.AddExp(30, watched == null || watched == h);
-                        }
-                    }
-                    else
-                    {
-                        e = Utils.Random(0, 4);
-                        string what;
-                        if ((e == 1 && h.weapon == Item.max_item_level)
-                            || (e == 2 && h.armor == Item.max_item_level)
-                            || (e == 3 && h.potions == Hero.max_potions && h.hp == h.hpmax))
-                            e = 0;
-                        switch (e)
-                        {
-                            default:
-                            case 0:
-                                {
-                                    int count = Utils.Random(10, 20);
-                                    what = $"{count} gold pile";
-                                    h.gold += count;
-                                }
-                                break;
-                            case 1:
-                                h.weapon++;
-                                what = Item.weapon_names[h.weapon];
-                                break;
-                            case 2:
-                                h.armor++;
-                                what = $"{Item.armor_names[h.armor]} armor";
-                                break;
-                            case 3:
-                                h.potions += 2;
-                                if(h.potions > Hero.max_potions)
-                                {
-                                    h.hp = Math.Min(h.hpmax, (Utils.Random(2, 5) + h.level / 2) * (h.potions - Hero.max_potions));
-                                    h.potions = Hero.max_potions;
-                                }
-                                what = "potions";
-                                break;
-                            case 4:
-                                {
-                                    int count = Utils.Random(50, 100);
-                                    what = $"{count} gold treasure";
-                                    h.gold += count;
-                                }
-                                break;
-                        }
-                        if (watched == null || watched == h)
-                            Console.WriteLine($"{h.name} finds {what}.");
-                        h.AddExp(5, watched == null || watched == h);
-                    }
+                        break;
+                    case Order.Explore:
+                        ExploreDungeon(h, false, notify);
+                        break;
                 }
             }
 
             foreach (Hero h in to_remove)
             {
                 if (h == watched)
+                {
+                    watched.controlled = false;
                     watched = null;
+                }
                 heroes.Remove(h);
             }
 
@@ -336,10 +305,108 @@ namespace Genjiworlds
             }
         }
 
+        void ExploreDungeon(Hero h, bool exit, bool notify)
+        {
+            int e = Utils.Random(0, 3);
+            if (e == 0)
+            {
+                if (!exit && notify)
+                    Console.WriteLine($"{h.Name} explores dungeon.");
+                h.AddExp(1, notify);
+            }
+            else if (e == 1)
+            {
+                int dmg = Utils.Random(2, 8) - h.armor;
+                if (dmg < 1)
+                    dmg = 1;
+                h.hp -= dmg;
+                if (h.hp <= 0)
+                {
+                    to_remove.Add(h);
+                    if (notify)
+                        Console.WriteLine($"{h.Name} was killed by a trap.");
+                }
+                else
+                {
+                    if (notify)
+                        Console.WriteLine($"{h.Name} takes {dmg} damage from trap.");
+                    h.AddExp(5, notify);
+                }
+            }
+            else if (e == 2)
+            {
+                bool win = Combat(h, watched == h);
+                if (watched == null)
+                {
+                    string str;
+                    if (Utils.Rand() % 2 == 0)
+                        str = "won combat";
+                    else
+                        str = "got killed";
+                    Console.WriteLine($"{h.Name} was attacked by orc and {str}.");
+                }
+                if (win)
+                {
+                    int reward = Utils.Random(20, 40);
+                    h.gold += reward;
+                    if (notify)
+                        Console.WriteLine($"{h.Name} takes {reward} gold from corpse.");
+                    h.AddExp(30, notify);
+                }
+            }
+            else
+            {
+                e = Utils.Random(0, 4);
+                string what;
+                if ((e == 1 && h.weapon == Item.max_item_level)
+                    || (e == 2 && h.armor == Item.max_item_level)
+                    || (e == 3 && h.potions == Hero.max_potions && h.hp == h.hpmax))
+                    e = 0;
+                switch (e)
+                {
+                    default:
+                    case 0:
+                        {
+                            int count = Utils.Random(10, 20);
+                            what = $"{count} gold pile";
+                            h.gold += count;
+                        }
+                        break;
+                    case 1:
+                        h.weapon++;
+                        what = Item.weapon_names[h.weapon];
+                        break;
+                    case 2:
+                        h.armor++;
+                        what = $"{Item.armor_names[h.armor]} armor";
+                        break;
+                    case 3:
+                        h.potions += 2;
+                        if (h.potions > Hero.max_potions)
+                        {
+                            h.hp = Math.Min(h.hpmax, (Utils.Random(2, 5) + h.level / 2) * (h.potions - Hero.max_potions));
+                            h.potions = Hero.max_potions;
+                        }
+                        what = "potions";
+                        break;
+                    case 4:
+                        {
+                            int count = Utils.Random(50, 100);
+                            what = $"{count} gold treasure";
+                            h.gold += count;
+                        }
+                        break;
+                }
+                if (notify)
+                    Console.WriteLine($"{h.Name} finds {what}.");
+                h.AddExp(5, notify);
+            }
+        }
+
         bool Combat(Hero h, bool details)
         {
             if(details)
-                Console.WriteLine($"{h.name} was attacked by orc.");
+                Console.WriteLine($"{h.Name} was attacked by orc.");
             int player_ini = Utils.Random(1, 10) + h.dex,
                 enemy_ini = Utils.Random(1, 10);
             bool hero_turn = player_ini >= enemy_ini;
@@ -356,20 +423,20 @@ namespace Genjiworlds
                         if(enemy_hp <= 0)
                         {
                             if (details)
-                                Console.WriteLine($"{h.name} attacks orc for {dmg} damage and kills him.");
+                                Console.WriteLine($"{h.Name} attacks orc for {dmg} damage and kills him.");
                             h.kills++;
                             return true;
                         }
                         else
                         {
                             if(details)
-                                Console.WriteLine($"{h.name} attacks orc for {dmg} damage.");
+                                Console.WriteLine($"{h.Name} attacks orc for {dmg} damage.");
                         }
                     }
                     else
                     {
                         if (details)
-                            Console.WriteLine($"{h.name} tries to attack orc but misses.");
+                            Console.WriteLine($"{h.Name} tries to attack orc but misses.");
                     }
                     hero_turn = false;
                 }
@@ -386,19 +453,19 @@ namespace Genjiworlds
                         {
                             to_remove.Add(h);
                             if (details)
-                                Console.WriteLine($"Orc attacks {h.name} for {dmg} damage and kills him.");
+                                Console.WriteLine($"Orc attacks {h.NameMid} for {dmg} damage and kills him.");
                             return false;
                         }
                         else
                         {
                             if (details)
-                                Console.WriteLine($"Orc attacks {h.name} for {dmg} damage.");
+                                Console.WriteLine($"Orc attacks {h.NameMid} for {dmg} damage.");
                         }
                     }
                     else
                     {
                         if (details)
-                            Console.WriteLine($"Orc tries to attack {h.name} but misses.");
+                            Console.WriteLine($"Orc tries to attack {h.NameMid} but misses.");
                     }
                     hero_turn = true;
                 }
@@ -420,6 +487,7 @@ namespace Genjiworlds
                     foreach (Hero h in heroes)
                         h.Save(f);
                     f.Write(watched?.id ?? -1);
+                    f.Write(controlled);
                     f.Write(file_end_sign);
                 }
                 Console.WriteLine("Save completed.");
@@ -465,6 +533,9 @@ namespace Genjiworlds
                         watched = null;
                     else
                         watched = heroes.Single(x => x.id == watched_id);
+                    controlled = f.ReadBoolean();
+                    if (watched != null)
+                        watched.controlled = true;
                     first_turn = true;
                     return LoadResult.Ok;
                 }
