@@ -18,6 +18,16 @@ namespace Genjiworlds
             return rnd.Next(a, b);
         }
 
+        public static int Random(Tuple<int, int> t)
+        {
+            return rnd.Next(t.Item1, t.Item2);
+        }
+
+        public static float Random(float a, float b)
+        {
+            return ((float)((b - a) * rnd.NextDouble())) + a;
+        }
+
         public static char ReadKey(string allowed)
         {
             while(true)

@@ -1,4 +1,6 @@
-﻿namespace Genjiworlds
+﻿using System;
+
+namespace Genjiworlds
 {
     public static class Item
     {
@@ -7,6 +9,12 @@
             "club",
             "sword",
             "magic sword"
+        };
+        public static Tuple<int, int>[] weapon_dmg =
+        {
+            new Tuple<int, int>(1, 4),
+            new Tuple<int, int>(2, 6),
+            new Tuple<int, int>(3, 8)
         };
 
         public static string[] armor_names =

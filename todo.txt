@@ -1,6 +1,9 @@
-﻿v2:
-+ hero advancement
-
-v3:
+﻿v3:
 + harder enemies
 + god mode - add gold
+
++ races
++ classes
++ quests
++ magic items
++ more locations

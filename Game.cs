@@ -20,6 +20,7 @@ namespace Genjiworlds
 
         public void Run()
         {
+            Console.Title = $"Genjiworlds v{version}";
             quit = false;
             Init();
             while(!quit)
@@ -50,7 +51,10 @@ namespace Genjiworlds
                         Console.WriteLine($"Turn {turn}, heroes {heroes.Count}{oldest_str}{winner_str}");
                     }
                     else
-                        Console.WriteLine($"Turn {turn}, hero {watched.name} - inside {(watched.inside_city ? "city" : "dungeon")} (hp {watched.hp}/{Hero.max_hp}, age {watched.age}, kills {watched.kills})");
+                    {
+                        Console.WriteLine($"Turn {turn}, hero {watched.name} - inside {(watched.inside_city ? "city" : "dungeon")}\n"
+                            + $"(level:{watched.level}, exp:{watched.exp}/{watched.exp_need}, hp:{watched.hp}/{watched.hpmax})");
+                    }
                     Update();
                 }
                 ParseCommand();
@@ -84,11 +88,14 @@ namespace Genjiworlds
                                 watched = null;
                             else
                             {
-                                watched = heroes.FirstOrDefault(x => x.name == name);
-                                if (watched == null)
+                                Hero h = heroes.FirstOrDefault(x => x.name == name);
+                                if (h == null)
                                     Console.WriteLine($"No hero with name {name}.");
                                 else
+                                {
+                                    watched = h;
                                     Console.WriteLine($"Watching {name}.");
+                                }
                             }
                         }
                         break;
@@ -173,7 +180,8 @@ namespace Genjiworlds
                     }
                     else if(h.ShouldRest())
                     {
-                        h.hp = Math.Min(Hero.max_hp, h.hp + Utils.Random(2, 3));
+                        int healed = (int)(Utils.Random(0.15f, 0.2f) * h.hpmax);
+                        h.hp = Math.Min(h.hpmax, h.hp + healed);
                         if(watched == null || watched == h)
                             Console.WriteLine($"{h.name} rests inside city.");
                     }
@@ -188,10 +196,10 @@ namespace Genjiworlds
                 {
                     if(h.potions > 0 && h.ShouldDrinkPotion())
                     {
-                        int heal = Utils.Random(2, 5);
+                        int heal = Utils.Random(2, 5) + h.level / 2;
                         if (watched == null || watched == h)
                             Console.WriteLine($"{h.name} drinks potion and is healed for {heal} points.");
-                        h.hp = Math.Min(Hero.max_hp, h.hp + heal);
+                        h.hp = Math.Min(h.hpmax, h.hp + heal);
                         --h.potions;
                         continue;
                     }
@@ -217,6 +225,7 @@ namespace Genjiworlds
                     {
                         if(!exit && (watched == null || watched == h))
                             Console.WriteLine($"{h.name} explores dungeon.");
+                        h.AddExp(1, watched == null || watched == h);
                     }
                     else if (e == 1)
                     {
@@ -234,6 +243,7 @@ namespace Genjiworlds
                         {
                             if (watched == null || watched == h)
                                 Console.WriteLine($"{h.name} takes {dmg} damage from trap.");
+                            h.AddExp(5, watched == null || watched == h);
                         }
                     }
                     else if (e == 2)
@@ -254,6 +264,7 @@ namespace Genjiworlds
                             h.gold += reward;
                             if (watched == null || watched == h)
                                 Console.WriteLine($"{h.name} takes {reward} gold from corpse.");
+                            h.AddExp(30, watched == null || watched == h);
                         }
                     }
                     else
@@ -262,7 +273,7 @@ namespace Genjiworlds
                         string what;
                         if ((e == 1 && h.weapon == Item.max_item_level)
                             || (e == 2 && h.armor == Item.max_item_level)
-                            || (e == 3 && h.potions == Hero.max_potions && h.hp == Hero.max_hp))
+                            || (e == 3 && h.potions == Hero.max_potions && h.hp == h.hpmax))
                             e = 0;
                         switch (e)
                         {
@@ -286,7 +297,7 @@ namespace Genjiworlds
                                 h.potions += 2;
                                 if(h.potions > Hero.max_potions)
                                 {
-                                    h.hp = Math.Min(Hero.max_hp, Utils.Random(2, 5) * (h.potions - Hero.max_potions));
+                                    h.hp = Math.Min(h.hpmax, (Utils.Random(2, 5) + h.level / 2) * (h.potions - Hero.max_potions));
                                     h.potions = Hero.max_potions;
                                 }
                                 what = "potions";
@@ -301,6 +312,7 @@ namespace Genjiworlds
                         }
                         if (watched == null || watched == h)
                             Console.WriteLine($"{h.name} finds {what}.");
+                        h.AddExp(5, watched == null || watched == h);
                     }
                 }
             }
@@ -328,15 +340,18 @@ namespace Genjiworlds
         {
             if(details)
                 Console.WriteLine($"{h.name} was attacked by orc.");
-            bool hero_turn = Utils.Rand() % 2 == 0;
+            int player_ini = Utils.Random(1, 10) + h.dex,
+                enemy_ini = Utils.Random(1, 10);
+            bool hero_turn = player_ini >= enemy_ini;
             int enemy_hp = 10;
             while(true)
             {
                 if(hero_turn)
                 {
-                    if(Utils.Rand() % 3 != 0)
+                    int attack = Utils.Random(1, 10) + h.dex;
+                    if(attack > 5)
                     {
-                        int dmg = Utils.Random(1, 4) + h.weapon;
+                        int dmg = Utils.Random(Item.weapon_dmg[h.weapon]) + h.str;
                         enemy_hp -= dmg;
                         if(enemy_hp <= 0)
                         {
@@ -360,7 +375,8 @@ namespace Genjiworlds
                 }
                 else
                 {
-                    if (Utils.Rand() % 3 != 0)
+                    int attack = Utils.Random(1, 10);
+                    if (attack > 5 + h.dex)
                     {
                         int dmg = Utils.Random(1, 4) - h.armor;
                         if (dmg < 1)
