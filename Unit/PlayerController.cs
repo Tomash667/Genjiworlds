@@ -6,19 +6,57 @@ namespace Genjiworlds.Unit
     {
         public Game game;
         private Hero h;
+        private int last_msg = 0;
+        const int msg_count = 20;
+        string[] msgs = new string[msg_count];
+
+        public void Clear()
+        {
+            last_msg = 0;
+        }
 
         public Order Think(Hero h)
         {
             this.h = h;
+            Order order;
             if (h.inside_city)
-                return HandleCity();
+                order = HandleCity();
             else
-                return HandleDungeon();
+                order = HandleDungeon();
+            last_msg = 0;
+            return order;
         }
+
+        public void Notify(string str)
+        {
+            if(last_msg == msg_count)
+            {
+                for (int i = 0; i < msg_count - 1; ++i)
+                    msgs[i] = msgs[i + 1];
+                msgs[msg_count - 1] = str;
+            }
+            else
+            {
+                msgs[last_msg] = str;
+                ++last_msg;
+            }
+        }
+
+        public bool CombatDetails { get { return true; } }
 
         private void WriteHeader()
         {
             Console.WriteLine($"{h.name} (level:{h.level}, exp:{h.exp}/{h.exp_need}, hp:{h.hp}/{h.hpmax})");
+        }
+
+        private void WriteMessages()
+        {
+            for (int i = 0; i < last_msg; ++i)
+            {
+                if (msgs[i] == null)
+                    break;
+                Console.WriteLine(msgs[i]);
+            }
         }
 
         private Order HandleCity()
@@ -27,7 +65,9 @@ namespace Genjiworlds.Unit
             {
                 Console.Clear();
                 WriteHeader();
-                Console.WriteLine($"You are inside city, gold:{h.gold}. (b-buy, r-rest, v-view, g-go to dungeon, C-use command)\n>");
+                Console.WriteLine($"You are inside city, gold:{h.gold}. (b-buy, r-rest, v-view, g-go to dungeon, C-use command)");
+                WriteMessages();
+                Console.Write(">");
                 char c = Utils.ReadKey("brvgXC");
                 switch (c)
                 {
@@ -127,7 +167,10 @@ namespace Genjiworlds.Unit
                                     bought = true;
                                     h.gold -= count * Item.potion_price;
                                     h.potions += count;
-                                    Console.WriteLine($"You bought {Item.armor_names[h.armor]}.");
+                                    if(count == 1)
+                                        Console.WriteLine("You bought potion.");
+                                    else
+                                        Console.WriteLine($"You bought {count} potions.");
                                     Utils.Ok();
                                 }
                             }
@@ -145,7 +188,9 @@ namespace Genjiworlds.Unit
             {
                 Console.Clear();
                 WriteHeader();
-                Console.WriteLine($"You are inside dungeon, potions {h.potions}. (e-explore, g-go to city, p-use potion, C-use command)\n>");
+                Console.WriteLine($"You are inside dungeon, potions {h.potions}. (e-explore, g-go to city, p-use potion, C-use command)");
+                WriteMessages();
+                Console.Write(">");
                 char c = Utils.ReadKey("egpC");
                 switch(c)
                 {

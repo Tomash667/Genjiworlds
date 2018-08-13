@@ -1,14 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Genjiworlds.Unit
 {
     public class AiController : IUnitController
     {
         public bool notify;
+        public bool watched;
 
         public Order Think(Hero h)
         {
@@ -31,5 +28,13 @@ namespace Genjiworlds.Unit
                     return Order.Explore;
             }
         }
+
+        public void Notify(string str)
+        {
+            if (notify)
+                Console.WriteLine(str);
+        }
+
+        public bool CombatDetails { get { return watched; } }
     }
 }

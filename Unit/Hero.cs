@@ -18,6 +18,8 @@ namespace Genjiworlds
         public int age, kills;
         public bool inside_city;
         public bool controlled;
+        // temporary
+        public bool gained_level;
 
         public const int max_potions = 5;
         private static List<string> bought_items = new List<string>();
@@ -230,7 +232,7 @@ namespace Genjiworlds
             hp += hpmax - prevhp;
         }
 
-        public void AddExp(int e, bool show)
+        public void AddExp(int e, IUnitController controller)
         {
             exp += e;
             if (exp < exp_need)
@@ -238,10 +240,9 @@ namespace Genjiworlds
             ++level;
             exp -= exp_need;
             exp_need += 100;
-            if (show)
-                Console.WriteLine($"{Name} gained {level} level.");
+            controller.Notify($"{Name} gained {level} level.");
             if (controlled)
-                PickAttribute();
+                gained_level = true;
             else
             {
                 switch (Utils.Rand() % 3)
@@ -256,8 +257,8 @@ namespace Genjiworlds
                         ++end;
                         break;
                 }
+                RecalculateHp();
             }
-            RecalculateHp();
         }
 
         public void PickAttribute()

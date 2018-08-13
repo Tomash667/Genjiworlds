@@ -114,7 +114,8 @@ namespace Genjiworlds
                                     bool prev_controlled = controlled;
                                     if (watched != null)
                                         watched.controlled = false;
-                                    controlled = false;
+                                    controlled = !watch;
+                                    pc.Clear();
                                     Console.WriteLine($"{(watch ? "Watching" : "Controlling")} {name}.");
                                     if (prev_controlled)
                                         return true;
@@ -186,6 +187,7 @@ namespace Genjiworlds
                             heroes.Add(h);
                             watched = h;
                             controlled = true;
+                            pc.Clear();
                             Console.WriteLine($"Controlling {name}.");
                             if (controlled_quit)
                                 return true;
@@ -218,11 +220,12 @@ namespace Genjiworlds
             foreach(Hero h in heroes)
             {
                 ++h.age;
-                bool notify = watched == null || watched == h;
 
                 Order order = Order.None;
+                IUnitController controller = null;
                 if(controlled && h == watched)
                 {
+                    controller = pc;
                     order = pc.Think(h);
                     if(controlled_quit)
                     {
@@ -233,7 +236,9 @@ namespace Genjiworlds
 
                 if (order == Order.None)
                 {
-                    ai.notify = notify;
+                    controller = ai;
+                    ai.notify = watched == null || watched == h;
+                    ai.watched = watched == h;
                     order = ai.Think(h);
                 }
 
@@ -245,20 +250,17 @@ namespace Genjiworlds
                         {
                             int healed = (int)(Utils.Random(0.15f, 0.25f) * h.hpmax);
                             h.hp = Math.Min(h.hpmax, h.hp + healed);
-                            if (notify)
-                                Console.WriteLine($"{h.Name} rests inside city.");
+                            controller.Notify($"{h.Name} rests inside city.");
                         }
                         break;
                     case Order.GotoDungeon:
-                        if (notify)
-                            Console.WriteLine($"{h.Name} goes into dungeon.");
+                        controller.Notify($"{h.Name} goes into dungeon.");
                         h.inside_city = false;
                         break;
                     case Order.UsePotion:
                         {
                             int heal = Utils.Random(2, 5) + h.level / 2;
-                            if (notify)
-                                Console.WriteLine($"{h.Name} drinked potion and was healed for {heal} points.");
+                            controller.Notify($"{h.Name} drinked potion and was healed for {heal} points.");
                             h.hp = Math.Min(h.hpmax, h.hp + heal);
                             --h.potions;
                         }
@@ -266,19 +268,17 @@ namespace Genjiworlds
                     case Order.GotoCity:
                         if (Utils.Rand() % 2 == 0)
                         {
-                            if (notify)
-                                Console.WriteLine($"{h.Name} returns to city.");
+                            controller.Notify($"{h.Name} returns to city.");
                             h.inside_city = true;
                         }
                         else
                         {
-                            if (notify)
-                                Console.WriteLine($"{h.Name} searches for exit from dungeon but fails.");
-                            ExploreDungeon(h, true, notify);
+                            controller.Notify($"{h.Name} searches for exit from dungeon but fails.");
+                            ExploreDungeon(h, true, controller);
                         }
                         break;
                     case Order.Explore:
-                        ExploreDungeon(h, false, notify);
+                        ExploreDungeon(h, false, controller);
                         break;
                 }
             }
@@ -305,14 +305,14 @@ namespace Genjiworlds
             }
         }
 
-        void ExploreDungeon(Hero h, bool exit, bool notify)
+        void ExploreDungeon(Hero h, bool exit, IUnitController controller)
         {
             int e = Utils.Random(0, 3);
             if (e == 0)
             {
-                if (!exit && notify)
-                    Console.WriteLine($"{h.Name} explores dungeon.");
-                h.AddExp(1, notify);
+                if (!exit)
+                    controller.Notify($"{h.Name} explores dungeon.");
+                h.AddExp(1, controller);
             }
             else if (e == 1)
             {
@@ -323,19 +323,17 @@ namespace Genjiworlds
                 if (h.hp <= 0)
                 {
                     to_remove.Add(h);
-                    if (notify)
-                        Console.WriteLine($"{h.Name} was killed by a trap.");
+                    controller.Notify($"{h.Name} was killed by a trap.");
                 }
                 else
                 {
-                    if (notify)
-                        Console.WriteLine($"{h.Name} takes {dmg} damage from trap.");
-                    h.AddExp(5, notify);
+                    controller.Notify($"{h.Name} takes {dmg} damage from trap.");
+                    h.AddExp(5, controller);
                 }
             }
             else if (e == 2)
             {
-                bool win = Combat(h, watched == h);
+                bool win = Combat(h, controller);
                 if (watched == null)
                 {
                     string str;
@@ -343,15 +341,18 @@ namespace Genjiworlds
                         str = "won combat";
                     else
                         str = "got killed";
-                    Console.WriteLine($"{h.Name} was attacked by orc and {str}.");
+                    controller.Notify($"{h.Name} was attacked by orc and {str}.");
                 }
                 if (win)
                 {
                     int reward = Utils.Random(20, 40);
                     h.gold += reward;
-                    if (notify)
-                        Console.WriteLine($"{h.Name} takes {reward} gold from corpse.");
-                    h.AddExp(30, notify);
+                    controller.Notify($"{h.Name} takes {reward} gold from corpse.");
+                    h.AddExp(30, controller);
+                }
+                else
+                {
+                    // TODO
                 }
             }
             else
@@ -397,16 +398,16 @@ namespace Genjiworlds
                         }
                         break;
                 }
-                if (notify)
-                    Console.WriteLine($"{h.Name} finds {what}.");
-                h.AddExp(5, notify);
+                controller.Notify($"{h.Name} finds {what}.");
+                h.AddExp(5, controller);
             }
         }
 
-        bool Combat(Hero h, bool details)
+        bool Combat(Hero h, IUnitController controller)
         {
+            bool details = controller.CombatDetails;
             if(details)
-                Console.WriteLine($"{h.Name} was attacked by orc.");
+                controller.Notify($"{h.Name} was attacked by orc.");
             int player_ini = Utils.Random(1, 10) + h.dex,
                 enemy_ini = Utils.Random(1, 10);
             bool hero_turn = player_ini >= enemy_ini;
@@ -423,20 +424,20 @@ namespace Genjiworlds
                         if(enemy_hp <= 0)
                         {
                             if (details)
-                                Console.WriteLine($"{h.Name} attacks orc for {dmg} damage and kills him.");
+                                controller.Notify($"{h.Name} attacks orc for {dmg} damage and kills him.");
                             h.kills++;
                             return true;
                         }
                         else
                         {
                             if(details)
-                                Console.WriteLine($"{h.Name} attacks orc for {dmg} damage.");
+                                controller.Notify($"{h.Name} attacks orc for {dmg} damage.");
                         }
                     }
                     else
                     {
                         if (details)
-                            Console.WriteLine($"{h.Name} tries to attack orc but misses.");
+                            controller.Notify($"{h.Name} tries to attack orc but misses.");
                     }
                     hero_turn = false;
                 }
@@ -453,19 +454,19 @@ namespace Genjiworlds
                         {
                             to_remove.Add(h);
                             if (details)
-                                Console.WriteLine($"Orc attacks {h.NameMid} for {dmg} damage and kills him.");
+                                controller.Notify($"Orc attacks {h.NameMid} for {dmg} damage and kills him.");
                             return false;
                         }
                         else
                         {
                             if (details)
-                                Console.WriteLine($"Orc attacks {h.NameMid} for {dmg} damage.");
+                                controller.Notify($"Orc attacks {h.NameMid} for {dmg} damage.");
                         }
                     }
                     else
                     {
                         if (details)
-                            Console.WriteLine($"Orc tries to attack {h.NameMid} but misses.");
+                            controller.Notify($"Orc tries to attack {h.NameMid} but misses.");
                     }
                     hero_turn = true;
                 }

@@ -1,4 +1,8 @@
 ﻿v3:
++ player
+	-? go to city message is cleared
+	- dying -> infinite loop TODO
+	! gained_level handling
 + harder enemies
 + god mode - add gold
 
