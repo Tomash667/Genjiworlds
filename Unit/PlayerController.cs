@@ -18,6 +18,14 @@ namespace Genjiworlds.Unit
         public Order Think(Hero h)
         {
             this.h = h;
+            if(h.gained_level)
+            {
+                h.gained_level = false;
+                Console.Clear();
+                WriteHeader();
+                WriteMessages();
+                h.PickAttribute();
+            }
             Order order;
             if (h.inside_city)
                 order = HandleCity();
@@ -43,6 +51,15 @@ namespace Genjiworlds.Unit
         }
 
         public bool CombatDetails { get { return true; } }
+
+        public void Die()
+        {
+            Console.Clear();
+            WriteHeader();
+            WriteMessages();
+            Console.WriteLine("You died...");
+            Utils.Ok();
+        }
 
         private void WriteHeader()
         {
@@ -188,7 +205,7 @@ namespace Genjiworlds.Unit
             {
                 Console.Clear();
                 WriteHeader();
-                Console.WriteLine($"You are inside dungeon, potions {h.potions}. (e-explore, g-go to city, p-use potion, C-use command)");
+                Console.WriteLine($"You are inside dungeon, potions {h.potions}. (e-explore, g-go to city, p-use potion, v-view, C-use command)");
                 WriteMessages();
                 Console.Write(">");
                 char c = Utils.ReadKey("egpC");
@@ -206,6 +223,10 @@ namespace Genjiworlds.Unit
                             Console.WriteLine("You don't have any potions.");
                             Utils.Ok();
                         }
+                        break;
+                    case 'v':
+                        h.ShowInfo();
+                        Utils.Ok();
                         break;
                     case 'C':
                         Console.Write("\nCommand: ");

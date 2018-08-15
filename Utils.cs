@@ -15,12 +15,12 @@ namespace Genjiworlds
 
         public static int Random(int a, int b)
         {
-            return rnd.Next(a, b);
+            return rnd.Next(a, b + 1);
         }
 
         public static int Random(Tuple<int, int> t)
         {
-            return rnd.Next(t.Item1, t.Item2);
+            return rnd.Next(t.Item1, t.Item2 + 1);
         }
 
         public static float Random(float a, float b)

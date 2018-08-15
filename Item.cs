@@ -29,6 +29,6 @@ namespace Genjiworlds
 
         public const int max_item_level = 3;
         public static int[] item_price = { 50, 200, 1000 };
-        public const int potion_price = 15;
+        public const int potion_price = 12;
     }
 }

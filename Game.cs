@@ -13,7 +13,7 @@ namespace Genjiworlds
         List<Hero> heroes = new List<Hero>();
         List<Hero> to_remove = new List<Hero>();
         Hero watched;
-        bool quit, first_turn, controlled, controlled_quit;
+        bool quit, first_turn, controlled, controlled_quit, controlled_die;
         static readonly int[] spawn_rate = { 20, 10, 5 };
         static readonly byte[] save_sign = { (byte)'G', (byte)'E', (byte)'N', (byte)'J' };
         const byte version = 3;
@@ -63,7 +63,12 @@ namespace Genjiworlds
                     Update();
                 }
                 if (!controlled)
-                    ParseCommand();
+                {
+                    if (controlled_die)
+                        controlled_die = false;
+                    else
+                        ParseCommand();
+                }
                 if(!first_turn)
                     ++turn;
             }
@@ -96,12 +101,14 @@ namespace Genjiworlds
                             string name = Console.ReadLine();
                             if (name == "null")
                             {
+                                bool was_controlled = controlled;
                                 if (watched != null)
                                 {
                                     watched.controlled = false;
                                     watched = null;
+                                    controlled = false;
                                 }
-                                if (controlled)
+                                if (was_controlled)
                                     return true;
                             }
                             else
@@ -114,6 +121,7 @@ namespace Genjiworlds
                                     bool prev_controlled = controlled;
                                     if (watched != null)
                                         watched.controlled = false;
+                                    watched = h;
                                     controlled = !watch;
                                     pc.Clear();
                                     Console.WriteLine($"{(watch ? "Watching" : "Controlling")} {name}.");
@@ -289,6 +297,8 @@ namespace Genjiworlds
                 {
                     watched.controlled = false;
                     watched = null;
+                    controlled = false;
+                    controlled_die = true;
                 }
                 heroes.Remove(h);
             }
@@ -316,18 +326,33 @@ namespace Genjiworlds
             }
             else if (e == 1)
             {
-                int dmg = Utils.Random(2, 8) - h.armor;
-                if (dmg < 1)
-                    dmg = 1;
-                h.hp -= dmg;
-                if (h.hp <= 0)
+                int attack = Utils.Random(1, 10) - h.dex;
+                if (attack >= 3)
                 {
-                    to_remove.Add(h);
-                    controller.Notify($"{h.Name} was killed by a trap.");
+                    int dmg = Utils.Random(2, 8) - h.armor;
+                    if (dmg < 1)
+                        dmg = 1;
+                    h.hp -= dmg;
+                    if (h.hp <= 0)
+                    {
+                        to_remove.Add(h);
+                        if (watched == h && controlled)
+                        {
+                            controller.Notify($"You take {dmg} damage from trap.");
+                            pc.Die();
+                        }
+                        else
+                            controller.Notify($"{h.Name} takes {dmg} damage and is killed by a trap.");
+                    }
+                    else
+                    {
+                        controller.Notify($"{h.Name} takes {dmg} damage from trap.");
+                        h.AddExp(5, controller);
+                    }
                 }
                 else
                 {
-                    controller.Notify($"{h.Name} takes {dmg} damage from trap.");
+                    controller.Notify($"{h.Name} dodged trap.");
                     h.AddExp(5, controller);
                 }
             }
@@ -350,10 +375,8 @@ namespace Genjiworlds
                     controller.Notify($"{h.Name} takes {reward} gold from corpse.");
                     h.AddExp(30, controller);
                 }
-                else
-                {
-                    // TODO
-                }
+                else if(watched == h && controlled)
+                    pc.Die();
             }
             else
             {
@@ -535,7 +558,7 @@ namespace Genjiworlds
                     else
                         watched = heroes.Single(x => x.id == watched_id);
                     controlled = f.ReadBoolean();
-                    if (watched != null)
+                    if (watched != null && controlled)
                         watched.controlled = true;
                     first_turn = true;
                     return LoadResult.Ok;

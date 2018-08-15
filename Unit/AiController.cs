@@ -16,7 +16,7 @@ namespace Genjiworlds.Unit
                 else if (h.ShouldRest())
                     return Order.Rest;
                 else
-                    return Order.GotoCity;
+                    return Order.GotoDungeon;
             }
             else
             {
