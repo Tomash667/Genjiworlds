@@ -25,8 +25,7 @@ namespace Genjiworlds
         public int age, kills;
         public int dungeon_level, lowest_level, target_level;
         public AiOrder ai_order;
-        public bool know_down_stairs;
-        public bool controlled;
+        public bool know_down_stairs, controlled, immortal;
         // temporary
         public bool gained_level;
 
@@ -130,6 +129,7 @@ namespace Genjiworlds
             f.Write(lowest_level);
             f.Write(target_level);
             f.Write(know_down_stairs);
+            f.Write(immortal);
         }
 
         public void Load(BinaryReader f)
@@ -154,6 +154,7 @@ namespace Genjiworlds
             lowest_level = f.ReadInt32();
             target_level = f.ReadInt32();
             know_down_stairs = f.ReadBoolean();
+            immortal = f.ReadBoolean();
         }
 
         public string Location

@@ -7,22 +7,38 @@ namespace Genjiworlds
         private static string[] pre = new string[]
         {
             "ad",
+            "bar",
             "ce",
             "do",
+            "ed",
+            "fi",
+            "grze",
+            "hen",
+            "i",
+            "ja",
             "kon",
+            "le",
+            "łu",
             "ma",
             "mar",
             "mi",
+            "nor",
+            "o",
             "pa",
             "pio",
             "prze",
+            "ra",
             "sła",
-            "to"
+            "to",
+            "woj",
+            "zbig"
         };
 
         private static string[] mid = new string[]
         {
+            "do",
             "ko",
+            "li",
             "ma",
             "mek",
             "mi",
@@ -34,21 +50,34 @@ namespace Genjiworlds
 
         private static string[] end = new string[]
         {
+            "bert",
+            "cek",
+            "ciech",
+            "gor",
+            "gorz",
+            "lip",
             "łaj",
             "mir",
             "mek",
+            "niew",
             "nik",
+            "on",
+            "kasz",
             "rad",
             "rian",
             "ry",
+            "ryk",
             "sław",
             "szu",
+            "tek",
             "tin",
             "tryk",
             "trek",
             "usz",
+            "ward",
             "weł",
-            "wek"
+            "wek",
+            "wier"
         };
 
         public static string GetName()

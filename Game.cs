@@ -19,7 +19,7 @@ namespace Genjiworlds
         bool quit, first_turn, controlled, controlled_quit, controlled_die;
         static readonly int[] spawn_rate = { 20, 10, 5 };
         static readonly byte[] save_sign = { (byte)'G', (byte)'E', (byte)'N', (byte)'J' };
-        const byte version = 3;
+        const byte version = 4;
         const byte file_end_sign = 0xE3;
         PlayerController pc = new PlayerController();
         AiController ai = new AiController();
@@ -225,7 +225,7 @@ namespace Genjiworlds
                             switch(strs[0])
                             {
                                 case "help":
-                                    Console.WriteLine("=== Available cheats ===\nhelp - list all\nskip N - fast forward time\ngold N - give gold to watched hero");
+                                    Console.WriteLine("=== Available cheats ===\nhelp - list all\nskip N - fast forward time\ngold N - give gold to watched hero\nimmortal - makes watched hero immortal");
                                     break;
                                 case "skip":
                                     if(strs.Length >= 2 && int.TryParse(strs[1], out int turns) && turns > 0)
@@ -246,6 +246,13 @@ namespace Genjiworlds
                                     {
                                         watched.gold += gold;
                                         Console.WriteLine($"Added {gold} gold to {watched.name}.");
+                                    }
+                                    break;
+                                case "immortal":
+                                    if(watched != null)
+                                    {
+                                        watched.immortal = !watched.immortal;
+                                        Console.WriteLine($"{watched.Name} is now {(watched.immortal ? "" : "not ")}immortal.");
                                     }
                                     break;
                                 default:
@@ -464,6 +471,8 @@ namespace Genjiworlds
                     if (dmg < 1)
                         dmg = 1;
                     h.hp -= dmg;
+                    if (h.immortal && h.hp < 0)
+                        h.hp = 1;
                     if (h.hp <= 0)
                     {
                         to_remove.Add(h);
@@ -693,6 +702,8 @@ namespace Genjiworlds
                         if (dmg < 1)
                             dmg = 1;
                         h.hp -= dmg;
+                        if (h.immortal && h.hp < 1)
+                            h.hp = 1;
                         if (h.hp <= 0)
                         {
                             to_remove.Add(h);
