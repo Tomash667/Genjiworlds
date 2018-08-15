@@ -55,7 +55,7 @@ namespace Genjiworlds
         {
             StringBuilder sb = new StringBuilder();
             sb.Append(pre[Utils.Rand() % pre.Length]);
-            if(Utils.Rand() % 2 == 0)
+            if (Utils.Rand() % 2 == 0)
                 sb.Append(mid[Utils.Rand() % mid.Length]);
             sb.Append(end[Utils.Rand() % end.Length]);
             sb[0] = char.ToUpper(sb[0]);

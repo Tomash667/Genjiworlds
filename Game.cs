@@ -9,9 +9,11 @@ namespace Genjiworlds
 {
     class Game
     {
-        int turn, next_id;
+        public static Game instance;
+        int turn, next_id, max_hero_level, max_dungeon_level;
         List<Hero> heroes = new List<Hero>();
         List<Hero> to_remove = new List<Hero>();
+        List<string> journal = new List<string>();
         Hero watched;
         bool quit, first_turn, controlled, controlled_quit, controlled_die;
         static readonly int[] spawn_rate = { 20, 10, 5 };
@@ -25,10 +27,10 @@ namespace Genjiworlds
         {
             Console.Title = $"Genjiworlds v{version}";
             quit = false;
-            pc.game = this;
+            instance = this;
 
             Init();
-            while(!quit)
+            while (!quit)
             {
                 Console.Clear();
                 if (first_turn)
@@ -55,9 +57,9 @@ namespace Genjiworlds
                             winner_str = $", winner {winner.name} (kills {winner.kills})";
                         Console.WriteLine($"Turn {turn}, heroes {heroes.Count}{oldest_str}{winner_str}");
                     }
-                    else if(!controlled)
+                    else if (!controlled)
                     {
-                        Console.WriteLine($"Turn {turn}, hero {watched.name} - inside {(watched.inside_city ? "city" : "dungeon")}\n"
+                        Console.WriteLine($"Turn {turn}, hero {watched.name} - inside {watched.Location}\n"
                             + $"(level:{watched.level}, exp:{watched.exp}/{watched.exp_need}, hp:{watched.hp}/{watched.hpmax})");
                     }
                     Update();
@@ -69,7 +71,7 @@ namespace Genjiworlds
                     else
                         ParseCommand();
                 }
-                if(!first_turn)
+                if (!first_turn)
                     ++turn;
             }
         }
@@ -86,8 +88,9 @@ namespace Genjiworlds
                         quit = true;
                         return true;
                     case 'h':
-                        Console.WriteLine("h-help, c-create hero, t-take control, w-watch hero, v-view hero, s-save, l-load, r-restart, q-quit");
-                        return false;
+                    case '?':
+                        Console.WriteLine("h-help, c-create hero, t-take control, w-watch hero, v-view hero, j-journal, s-save, l-load, r-restart, q-quit, @-cheats");
+                        break;
                     case 'r':
                         if (controlled)
                             controlled_quit = true;
@@ -97,7 +100,7 @@ namespace Genjiworlds
                     case 't':
                         {
                             bool watch = c == 'w';
-                            Console.Write($"Hero name to {(watch?"watch":"controll")}: ");
+                            Console.Write($"Hero name to {(watch ? "watch" : "controll")}: ");
                             string name = Console.ReadLine();
                             if (name == "null")
                             {
@@ -167,7 +170,7 @@ namespace Genjiworlds
                                 c = Utils.ReadKey("rnq");
                                 if (c == 'r')
                                     continue;
-                                else if(c == 'q')
+                                else if (c == 'q')
                                 {
                                     quit = true;
                                     break;
@@ -201,8 +204,53 @@ namespace Genjiworlds
                                 return true;
                         }
                         break;
-                    default:
+                    case 'j':
+                        Console.WriteLine("World journal:");
+                        foreach (string str in journal)
+                            Console.WriteLine($"* {str}");
+                        if (journal.Count == 0)
+                            Console.WriteLine("(empty)");
+                        break;
+                    case ' ':
+                    case '\n':
+                    case '\r':
                         return false;
+                    case '@':
+                        {
+                            Console.WriteLine("Cheat command: ");
+                            string[] strs = Console.ReadLine().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                            if (strs.Length == 0)
+                                break;
+                            switch(strs[0])
+                            {
+                                case "help":
+                                    Console.WriteLine("=== Available cheats ===\nhelp - list all\nskip N - fast forward time\ngold N - give gold to watched hero");
+                                    break;
+                                case "skip":
+                                    if(strs.Length >= 2 && int.TryParse(strs[1], out int turns) && turns > 0)
+                                    {
+                                        Hero old_watched = watched;
+                                        Hero h = new Hero();
+                                        watched = h;
+                                        for(int i=0; i<turns; ++i)
+                                            Update();
+                                        turn += turns;
+                                        watched = old_watched;
+                                    }
+                                    break;
+                                case "gold":
+                                    if(strs.Length >= 2 && int.TryParse(strs[1], out int gold) && watched != null)
+                                    {
+                                        watched.gold += gold;
+                                        Console.WriteLine($"Added {gold} gold to {watched.name}.");
+                                    }
+                                    break;
+                                default:
+                                    Console.WriteLine($"Unknown cheat '{strs[0]}'.");
+                                    break;
+                            }
+                        }
+                        break;
                 }
             }
         }
@@ -211,12 +259,15 @@ namespace Genjiworlds
         {
             next_id = 0;
             turn = 1;
+            max_hero_level = 1;
+            max_dungeon_level = 1;
             first_turn = true;
             watched = null;
             controlled = false;
             heroes.Clear();
+            journal.Clear();
             int count = Utils.Random(10, 12);
-            for(int i=0; i<count; ++i)
+            for (int i = 0; i < count; ++i)
             {
                 Hero h = new Hero(next_id++);
                 heroes.Add(h);
@@ -225,17 +276,17 @@ namespace Genjiworlds
 
         void Update()
         {
-            foreach(Hero h in heroes)
+            foreach (Hero h in heroes)
             {
                 ++h.age;
 
                 Order order = Order.None;
                 IUnitController controller = null;
-                if(controlled && h == watched)
+                if (controlled && h == watched)
                 {
                     controller = pc;
                     order = pc.Think(h);
-                    if(controlled_quit)
+                    if (controlled_quit)
                     {
                         controlled_quit = false;
                         return;
@@ -250,7 +301,7 @@ namespace Genjiworlds
                     order = ai.Think(h);
                 }
 
-                switch(order)
+                switch (order)
                 {
                     case Order.Buy:
                         break;
@@ -261,28 +312,79 @@ namespace Genjiworlds
                             controller.Notify($"{h.Name} rests inside city.");
                         }
                         break;
-                    case Order.GotoDungeon:
-                        controller.Notify($"{h.Name} goes into dungeon.");
-                        h.inside_city = false;
+                    case Order.GoDown:
+                        if (h.dungeon_level == 0)
+                        {
+                            controller.Notify($"{h.Name} goes into dungeon.");
+                            h.dungeon_level = 1;
+                            if (h.lowest_level == 0)
+                                h.lowest_level = 1;
+                            h.PickTarget();
+                        }
+                        else
+                        {
+                            bool ok;
+                            if (h.lowest_level == h.dungeon_level)
+                                ok = Utils.Rand() % 4 == 0;
+                            else if (h.lowest_level - 1 == h.dungeon_level)
+                                ok = Utils.Rand() % 4 != 0;
+                            else
+                                ok = true;
+                            if (ok)
+                            {
+                                ++h.dungeon_level;
+                                controller.Notify($"{h.Name} goes to lower dungeon level {h.dungeon_level}.");
+                                if (h.lowest_level < h.dungeon_level)
+                                {
+                                    ++h.lowest_level;
+                                    h.know_down_stairs = false;
+                                    h.AddExp(10 * h.dungeon_level, controller);
+                                    if (h.dungeon_level > max_dungeon_level)
+                                    {
+                                        max_dungeon_level = h.dungeon_level;
+                                        journal.Add($"Hero {h.name} reached {h.dungeon_level} dungeon level.");
+                                    }
+                                }
+                                if (h.target_level == h.dungeon_level && h.ai_order == AiOrder.GotoTarget)
+                                    h.ai_order = AiOrder.Explore;
+                            }
+                            else
+                            {
+                                controller.Notify($"{h.name} searches for stairs to lower dungeon level but fails.");
+                                ExploreDungeon(h, true, controller);
+                            }
+                        }
                         break;
                     case Order.UsePotion:
                         {
-                            int heal = Utils.Random(2, 5) + h.level / 2;
+                            int heal = Utils.Random(2, 5) + h.level / 2 + h.end;
                             controller.Notify($"{h.Name} drinked potion and was healed for {heal} points.");
                             h.hp = Math.Min(h.hpmax, h.hp + heal);
                             --h.potions;
                         }
                         break;
-                    case Order.GotoCity:
-                        if (Utils.Rand() % 2 == 0)
+                    case Order.GoUp:
                         {
-                            controller.Notify($"{h.Name} returns to city.");
-                            h.inside_city = true;
-                        }
-                        else
-                        {
-                            controller.Notify($"{h.Name} searches for exit from dungeon but fails.");
-                            ExploreDungeon(h, true, controller);
+                            bool ok;
+                            if (h.dungeon_level == h.lowest_level)
+                                ok = Utils.Rand() % 2 == 0;
+                            else if (h.dungeon_level + 1 == h.lowest_level)
+                                ok = Utils.Rand() % 4 != 0;
+                            else
+                                ok = true;
+                            if (ok)
+                            {
+                                --h.dungeon_level;
+                                if (h.dungeon_level == 0)
+                                    controller.Notify($"{h.Name} returns to city.");
+                                else
+                                    controller.Notify($"{h.Name} goes to upper dungeon level {h.dungeon_level}.");
+                            }
+                            else
+                            {
+                                controller.Notify($"{h.Name} searches for exit from dungeon but fails.");
+                                ExploreDungeon(h, true, controller);
+                            }
                         }
                         break;
                     case Order.Explore:
@@ -308,23 +410,49 @@ namespace Genjiworlds
                 if (heroes.Count < rate && Utils.Rand() % 2 == 0)
                 {
                     Hero h = new Hero(next_id++);
-                    if(watched == null)
+                    if (watched == null)
                         Console.WriteLine($"{h.name} joins the city.");
                     heroes.Add(h);
                 }
             }
         }
 
+        enum ExploreEvent
+        {
+            Nothing,
+            Trap,
+            Combat,
+            Treasure,
+            Stairs,
+            Max
+        }
+
+        enum Treasure
+        {
+            GoldPile,
+            Weapon,
+            Armor,
+            Potions,
+            GoldTreasure,
+            Max
+        }
+
         void ExploreDungeon(Hero h, bool exit, IUnitController controller)
         {
-            int e = Utils.Random(0, 3);
-            if (e == 0)
+            ExploreEvent e = (ExploreEvent)(Utils.Rand() % (int)ExploreEvent.Max);
+
+            if (e == ExploreEvent.Stairs)
             {
-                if (!exit)
-                    controller.Notify($"{h.Name} explores dungeon.");
-                h.AddExp(1, controller);
+                if (h.dungeon_level != h.lowest_level || h.know_down_stairs)
+                    e = (ExploreEvent)(Utils.Rand() % ((int)ExploreEvent.Max - 1));
             }
-            else if (e == 1)
+
+            if (!exit)
+                controller.Notify($"{h.Name} explores dungeon.");
+
+            if (e == ExploreEvent.Nothing)
+                h.AddExp(1, controller);
+            else if (e == ExploreEvent.Trap)
             {
                 int attack = Utils.Random(1, 10) - h.dex;
                 if (attack >= 3)
@@ -356,7 +484,7 @@ namespace Genjiworlds
                     h.AddExp(5, controller);
                 }
             }
-            else if (e == 2)
+            else if (e == ExploreEvent.Combat)
             {
                 bool win = Combat(h, controller);
                 if (watched == null)
@@ -375,47 +503,47 @@ namespace Genjiworlds
                     controller.Notify($"{h.Name} takes {reward} gold from corpse.");
                     h.AddExp(30, controller);
                 }
-                else if(watched == h && controlled)
+                else if (watched == h && controlled)
                     pc.Die();
             }
-            else
+            else if (e == ExploreEvent.Treasure)
             {
-                e = Utils.Random(0, 4);
+                Treasure t = (Treasure)(Utils.Rand() % (int)Treasure.Max);
                 string what;
-                if ((e == 1 && h.weapon == Item.max_item_level)
-                    || (e == 2 && h.armor == Item.max_item_level)
-                    || (e == 3 && h.potions == Hero.max_potions && h.hp == h.hpmax))
-                    e = 0;
-                switch (e)
+                if ((t == Treasure.Weapon && (h.weapon == Item.max_item_level || h.weapon == h.dungeon_level))
+                    || (t == Treasure.Armor && (h.armor == Item.max_item_level || h.armor == h.dungeon_level))
+                    || (t == Treasure.Potions && h.potions == Hero.max_potions && h.hp == h.hpmax))
+                    t = Treasure.GoldPile;
+                switch (t)
                 {
                     default:
-                    case 0:
+                    case Treasure.GoldPile:
                         {
-                            int count = Utils.Random(10, 20);
+                            int count = Utils.Random(5, 15) + 5 * h.dungeon_level;
                             what = $"{count} gold pile";
                             h.gold += count;
                         }
                         break;
-                    case 1:
+                    case Treasure.Weapon:
                         h.weapon++;
                         what = Item.weapon_names[h.weapon];
                         break;
-                    case 2:
+                    case Treasure.Armor:
                         h.armor++;
                         what = $"{Item.armor_names[h.armor]} armor";
                         break;
-                    case 3:
+                    case Treasure.Potions:
                         h.potions += 2;
                         if (h.potions > Hero.max_potions)
                         {
-                            h.hp = Math.Min(h.hpmax, (Utils.Random(2, 5) + h.level / 2) * (h.potions - Hero.max_potions));
+                            h.hp = Math.Min(h.hpmax, (Utils.Random(2, 5) + h.level / 2 + h.end) * (h.potions - Hero.max_potions));
                             h.potions = Hero.max_potions;
                         }
                         what = "potions";
                         break;
-                    case 4:
+                    case Treasure.GoldTreasure:
                         {
-                            int count = Utils.Random(50, 100);
+                            int count = Utils.Random(30, 80) + 20 * h.dungeon_level;
                             what = $"{count} gold treasure";
                             h.gold += count;
                         }
@@ -424,27 +552,33 @@ namespace Genjiworlds
                 controller.Notify($"{h.Name} finds {what}.");
                 h.AddExp(5, controller);
             }
+            else if (e == ExploreEvent.Stairs)
+            {
+                h.know_down_stairs = true;
+                controller.Notify($"{h.Name} finds stairs to lower level.");
+                h.AddExp(5, controller);
+            }
         }
 
         bool Combat(Hero h, IUnitController controller)
         {
             bool details = controller.CombatDetails;
-            if(details)
+            if (details)
                 controller.Notify($"{h.Name} was attacked by orc.");
             int player_ini = Utils.Random(1, 10) + h.dex,
                 enemy_ini = Utils.Random(1, 10);
             bool hero_turn = player_ini >= enemy_ini;
             int enemy_hp = 10;
-            while(true)
+            while (true)
             {
-                if(hero_turn)
+                if (hero_turn)
                 {
                     int attack = Utils.Random(1, 10) + h.dex;
-                    if(attack > 5)
+                    if (attack > 5)
                     {
                         int dmg = Utils.Random(Item.weapon_dmg[h.weapon]) + h.str;
                         enemy_hp -= dmg;
-                        if(enemy_hp <= 0)
+                        if (enemy_hp <= 0)
                         {
                             if (details)
                                 controller.Notify($"{h.Name} attacks orc for {dmg} damage and kills him.");
@@ -453,7 +587,7 @@ namespace Genjiworlds
                         }
                         else
                         {
-                            if(details)
+                            if (details)
                                 controller.Notify($"{h.Name} attacks orc for {dmg} damage.");
                         }
                     }
@@ -496,17 +630,31 @@ namespace Genjiworlds
             }
         }
 
+        public void LevelUp(Hero h)
+        {
+            if (h.level > max_hero_level)
+            {
+                journal.Add($"Hero {h.name} gained {h.level} level.");
+                max_hero_level = h.level;
+            }
+        }
+
         void Save()
         {
             try
             {
                 using (FileStream fs = new FileStream("save", FileMode.Create))
-                using(BinaryWriter f = new BinaryWriter(fs))
+                using (BinaryWriter f = new BinaryWriter(fs))
                 {
                     f.Write(save_sign);
                     f.Write(version);
                     f.Write(turn);
                     f.Write(next_id);
+                    f.Write(max_hero_level);
+                    f.Write(max_dungeon_level);
+                    f.Write(journal.Count);
+                    foreach (string s in journal)
+                        f.Write(s);
                     f.Write(heroes.Count);
                     foreach (Hero h in heroes)
                         h.Save(f);
@@ -516,7 +664,7 @@ namespace Genjiworlds
                 }
                 Console.WriteLine("Save completed.");
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Console.WriteLine($"Save failed: {e}");
             }
@@ -544,9 +692,15 @@ namespace Genjiworlds
                         throw new Exception($"Unsupported version {ver} (current {version}).");
                     turn = f.ReadInt32();
                     next_id = f.ReadInt32();
+                    max_hero_level = f.ReadInt32();
+                    max_dungeon_level = f.ReadInt32();
                     int count = f.ReadInt32();
+                    journal.Clear();
+                    for (int i = 0; i < count; ++i)
+                        journal.Add(f.ReadString());
+                    count = f.ReadInt32();
                     heroes.Clear();
-                    for(int i=0; i<count; ++i)
+                    for (int i = 0; i < count; ++i)
                     {
                         Hero h = new Hero();
                         h.Load(f);
@@ -564,11 +718,11 @@ namespace Genjiworlds
                     return LoadResult.Ok;
                 }
             }
-            catch(FileNotFoundException)
+            catch (FileNotFoundException)
             {
                 return LoadResult.NoFile;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 Console.WriteLine($"Load failed: {e}");
                 return LoadResult.Failed;

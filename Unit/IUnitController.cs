@@ -5,9 +5,9 @@
         None,
         Buy,
         Rest,
-        GotoDungeon,
+        GoDown,
+        GoUp,
         Explore,
-        GotoCity,
         UsePotion
     }
 

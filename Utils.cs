@@ -30,7 +30,7 @@ namespace Genjiworlds
 
         public static char ReadKey(string allowed)
         {
-            while(true)
+            while (true)
             {
                 char c = Console.ReadKey(true).KeyChar;
                 if (allowed.IndexOf(c) != -1)
@@ -49,7 +49,7 @@ namespace Genjiworlds
             if (l.Count == 1)
                 return l[0];
             StringBuilder sb = new StringBuilder(l[0]);
-            for(int i=1; i<l.Count; ++i)
+            for (int i = 1; i < l.Count; ++i)
             {
                 if (i + 1 == l.Count)
                     sb.Append(" and ");
@@ -65,7 +65,7 @@ namespace Genjiworlds
             if (values.Length == 0)
                 return 0;
             int min = values[0];
-            for(int i=1; i<values.Length; ++i)
+            for (int i = 1; i < values.Length; ++i)
             {
                 if (values[i] < min)
                     min = values[i];

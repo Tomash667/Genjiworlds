@@ -9,21 +9,26 @@ namespace Genjiworlds.Unit
 
         public Order Think(Hero h)
         {
-            if (h.inside_city)
+            if (h.InsideCity)
             {
                 if (h.BuyItems(notify))
                     return Order.Buy;
                 else if (h.ShouldRest())
                     return Order.Rest;
                 else
-                    return Order.GotoDungeon;
+                    return Order.GoDown;
             }
             else
             {
                 if (h.potions > 0 && h.ShouldDrinkPotion())
                     return Order.UsePotion;
-                else if (h.ShouldExitDungeon())
-                    return Order.GotoCity;
+                else if (h.ai_order == AiOrder.ReturnToCity || h.ShouldExitDungeon())
+                {
+                    h.ai_order = AiOrder.ReturnToCity;
+                    return Order.GoUp;
+                }
+                else if (h.ai_order == AiOrder.GotoTarget && (h.dungeon_level != h.lowest_level || h.know_down_stairs))
+                    return Order.GoDown;
                 else
                     return Order.Explore;
             }

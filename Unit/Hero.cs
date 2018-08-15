@@ -5,6 +5,13 @@ using System.IO;
 
 namespace Genjiworlds
 {
+    public enum AiOrder
+    {
+        GotoTarget,
+        Explore,
+        ReturnToCity
+    }
+
     public class Hero
     {
         public int id;
@@ -16,7 +23,9 @@ namespace Genjiworlds
         public int gold;
         public int potions;
         public int age, kills;
-        public bool inside_city;
+        public int dungeon_level, lowest_level, target_level;
+        public AiOrder ai_order;
+        public bool know_down_stairs;
         public bool controlled;
         // temporary
         public bool gained_level;
@@ -61,11 +70,11 @@ namespace Genjiworlds
                 }
                 BuyItems(false);
             }
-            inside_city = true;
             hp = hpmax = CalculateMaxHp();
         }
 
         float Hpp { get { return ((float)hp) / hpmax; } }
+        public bool InsideCity => dungeon_level == 0;
 
         public bool ShouldRest()
         {
@@ -79,21 +88,23 @@ namespace Genjiworlds
 
         public bool ShouldExitDungeon()
         {
-            if (hp <= 2)
+            if (Hpp <= 0.25f)
                 return true;
-            else if (hp <= 5)
+            else if (Hpp <= 0.5f)
                 return Utils.Rand() % 3 != 0;
-            else if (hp <= 9)
+            else if (hp <= 0.9f && potions == 0)
                 return Utils.Rand() % 3 == 0;
-            else
+            else if (potions == 0 && gold > Item.potion_price)
                 return Utils.Rand() % 10 == 0;
+            else
+                return false;
         }
 
         public bool ShouldDrinkPotion()
         {
-            if (hp <= 5)
+            if (Hpp <= 0.5f)
                 return true;
-            else if (hp <= 7)
+            else if (Hpp <= 0.75f)
                 return Utils.Rand() % 3 == 0;
             else
                 return false;
@@ -115,7 +126,10 @@ namespace Genjiworlds
             f.Write(potions);
             f.Write(age);
             f.Write(kills);
-            f.Write(inside_city);
+            f.Write(dungeon_level);
+            f.Write(lowest_level);
+            f.Write(target_level);
+            f.Write(know_down_stairs);
         }
 
         public void Load(BinaryReader f)
@@ -136,12 +150,26 @@ namespace Genjiworlds
             potions = f.ReadInt32();
             age = f.ReadInt32();
             kills = f.ReadInt32();
-            inside_city = f.ReadBoolean();
+            dungeon_level = f.ReadInt32();
+            lowest_level = f.ReadInt32();
+            target_level = f.ReadInt32();
+            know_down_stairs = f.ReadBoolean();
+        }
+
+        public string Location
+        {
+            get
+            {
+                if (dungeon_level == 0)
+                    return "city";
+                else
+                    return $"dungeon {dungeon_level}";
+            }
         }
 
         public void ShowInfo()
         {
-            Console.WriteLine($"{name} [{id}] - inside {(inside_city ? "city" : "dungeon")}, level:{level}, exp:{exp}/{exp_need}\n"
+            Console.WriteLine($"{name} [{id}] - inside {Location}, level:{level}, exp:{exp}/{exp_need}\n"
                 + $"Hp:{hp}/{hpmax}, str:{str}, dex:{dex}, end:{end}\n"
                 + $"Gold:{gold}, weapon:{Item.weapon_names[weapon]}, armor:{Item.armor_names[armor]}, potions:{potions}\n"
                 + $"Age:{age}, kills:{kills}");
@@ -155,7 +183,7 @@ namespace Genjiworlds
             bought_items.Clear();
 
             // first potion if none
-            if(potions == 0 && gold >= Item.potion_price && Utils.Rand() % 2 == 0)
+            if (potions == 0 && gold >= Item.potion_price && Utils.Rand() % 2 == 0)
             {
                 bought_items.Add("potion");
                 gold -= Item.potion_price;
@@ -163,14 +191,14 @@ namespace Genjiworlds
 
             // weapon & armor
             bool check_weapon = Utils.Rand() % 2 == 0;
-            for(int i=0; i<2; ++i)
+            for (int i = 0; i < 2; ++i)
             {
                 if (check_weapon)
                 {
                     if (weapon < Item.max_item_level)
                     {
                         int price = Item.item_price[weapon];
-                        if(gold >= price)
+                        if (gold >= price)
                         {
                             ++weapon;
                             bought_items.Add(Item.weapon_names[weapon]);
@@ -180,10 +208,10 @@ namespace Genjiworlds
                 }
                 else
                 {
-                    if(armor < Item.max_item_level)
+                    if (armor < Item.max_item_level)
                     {
                         int price = Item.item_price[armor];
-                        if(gold >= price)
+                        if (gold >= price)
                         {
                             ++armor;
                             bought_items.Add(Item.armor_names[armor]);
@@ -195,10 +223,10 @@ namespace Genjiworlds
             }
 
             // more potions
-            if(potions != max_potions && gold >= Item.potion_price)
+            if (potions != max_potions && gold >= Item.potion_price)
             {
                 int to_buy = Math.Min(gold / Item.potion_price, 5 - potions);
-                if(to_buy > 0)
+                if (to_buy > 0)
                 {
                     potions += to_buy;
                     gold -= to_buy * Item.potion_price;
@@ -207,7 +235,7 @@ namespace Genjiworlds
                         bought_items.RemoveAt(0);
                         to_buy++;
                     }
-                    if(to_buy > 1)
+                    if (to_buy > 1)
                         bought_items.Add($"{to_buy} potions");
                     else
                         bought_items.Add("potion");
@@ -220,9 +248,9 @@ namespace Genjiworlds
             return bought_items.Count > 0;
         }
 
-        private int CalculateMaxHp()
+        public int CalculateMaxHp()
         {
-            return 9 + level + (end + 1) / 2 * level;
+            return 8 + (level + end) * 2;
         }
 
         private void RecalculateHp()
@@ -241,6 +269,7 @@ namespace Genjiworlds
             exp -= exp_need;
             exp_need += 100;
             controller.Notify($"{Name} gained {level} level.");
+            Game.instance.LevelUp(this);
             if (controlled)
                 gained_level = true;
             else
@@ -265,7 +294,7 @@ namespace Genjiworlds
         {
             Console.WriteLine("Pick attribute (str, dex, end): ");
             char c = Utils.ReadKey("sde");
-            switch(c)
+            switch (c)
             {
                 case 's':
                     ++str;
@@ -278,6 +307,33 @@ namespace Genjiworlds
                     break;
             }
             RecalculateHp();
+        }
+
+        public void PickTarget()
+        {
+            int max_level = level / 2;
+            int go;
+            switch (Utils.Random(0, 3))
+            {
+                default:
+                case 0:
+                    go = max_level + 1;
+                    break;
+                case 1:
+                case 2:
+                    go = max_level;
+                    break;
+                case 3:
+                    go = max_level - 1;
+                    break;
+            }
+            ++go;
+            if (go <= 1)
+                go = 1;
+            target_level = go;
+            ai_order = AiOrder.GotoTarget;
+            if (target_level == 1)
+                ai_order = AiOrder.Explore;
         }
     }
 }

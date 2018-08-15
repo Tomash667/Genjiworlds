@@ -4,7 +4,6 @@ namespace Genjiworlds.Unit
 {
     class PlayerController : IUnitController
     {
-        public Game game;
         private Hero h;
         private int last_msg = 0;
         const int msg_count = 20;
@@ -18,7 +17,7 @@ namespace Genjiworlds.Unit
         public Order Think(Hero h)
         {
             this.h = h;
-            if(h.gained_level)
+            if (h.gained_level)
             {
                 h.gained_level = false;
                 Console.Clear();
@@ -27,7 +26,7 @@ namespace Genjiworlds.Unit
                 h.PickAttribute();
             }
             Order order;
-            if (h.inside_city)
+            if (h.InsideCity)
                 order = HandleCity();
             else
                 order = HandleDungeon();
@@ -37,7 +36,7 @@ namespace Genjiworlds.Unit
 
         public void Notify(string str)
         {
-            if(last_msg == msg_count)
+            if (last_msg == msg_count)
             {
                 for (int i = 0; i < msg_count - 1; ++i)
                     msgs[i] = msgs[i + 1];
@@ -95,14 +94,14 @@ namespace Genjiworlds.Unit
                     case 'r':
                         return Order.Rest;
                     case 'g':
-                        return Order.GotoDungeon;
+                        return Order.GoDown;
                     case 'v':
                         h.ShowInfo();
                         Utils.Ok();
                         break;
                     case 'C':
                         Console.Write("\nCommand: ");
-                        if (game.ParseCommand())
+                        if (Game.instance.ParseCommand())
                             return Order.None;
                         break;
                 }
@@ -184,7 +183,7 @@ namespace Genjiworlds.Unit
                                     bought = true;
                                     h.gold -= count * Item.potion_price;
                                     h.potions += count;
-                                    if(count == 1)
+                                    if (count == 1)
                                         Console.WriteLine("You bought potion.");
                                     else
                                         Console.WriteLine($"You bought {count} potions.");
@@ -201,20 +200,31 @@ namespace Genjiworlds.Unit
 
         private Order HandleDungeon()
         {
-            while(true)
+            while (true)
             {
                 Console.Clear();
                 WriteHeader();
-                Console.WriteLine($"You are inside dungeon, potions {h.potions}. (e-explore, g-go to city, p-use potion, v-view, C-use command)");
+                string go;
+                if (h.InsideCity)
+                    go = "u-go to city";
+                else
+                    go = "u-go upper level";
+                if (h.dungeon_level != h.lowest_level || h.know_down_stairs)
+                    go += ", d-go lower level";
+                Console.WriteLine($"You are inside dungeon {h.dungeon_level}, potions {h.potions}. (e-explore, {go}, p-use potion, v-view, C-use command)");
                 WriteMessages();
                 Console.Write(">");
-                char c = Utils.ReadKey("egpC");
-                switch(c)
+                char c = Utils.ReadKey("eudpC");
+                switch (c)
                 {
                     case 'e':
                         return Order.Explore;
-                    case 'g':
-                        return Order.GotoCity;
+                    case 'u':
+                        return Order.GoUp;
+                    case 'd':
+                        if (h.dungeon_level != h.lowest_level || h.know_down_stairs)
+                            return Order.GoDown;
+                        break;
                     case 'p':
                         if (h.potions > 0)
                             return Order.UsePotion;
@@ -230,7 +240,7 @@ namespace Genjiworlds.Unit
                         break;
                     case 'C':
                         Console.Write("\nCommand: ");
-                        if (game.ParseCommand())
+                        if (Game.instance.ParseCommand())
                             return Order.None;
                         break;
                 }

@@ -1,7 +1,6 @@
 ﻿v3:
-+ dungeon depth
 + harder enemies
-+ god mode - add gold
+- ai can get stuck at level (ex 3) - too easy to lose all potions and return to city & then go to next level
 
 + races
 + classes
@@ -9,3 +8,9 @@
 + magic items
 + more locations
 + graveyard
++ artifacts
++ corpse with items
++ god mode - immortality
++ ranged combat
++ teams
++ stats (oldest, most kills, most exp, monsters kills/killed)
