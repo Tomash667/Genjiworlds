@@ -27,7 +27,8 @@ namespace Genjiworlds.Unit
                     h.ai_order = AiOrder.ReturnToCity;
                     return Order.GoUp;
                 }
-                else if (h.ai_order == AiOrder.GotoTarget && (h.dungeon_level != h.lowest_level || h.know_down_stairs))
+                else if ((h.ai_order == AiOrder.GotoTarget || (h.level > h.dungeon_level && Utils.Rand() % 4 == 0))
+                    && (h.dungeon_level != h.lowest_level || h.know_down_stairs))
                     return Order.GoDown;
                 else
                     return Order.Explore;

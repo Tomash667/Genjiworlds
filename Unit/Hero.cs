@@ -278,12 +278,18 @@ namespace Genjiworlds
                 {
                     case 0:
                         ++str;
+                        if (controller.CombatDetails)
+                            controller.Notify($"{Name} increased strength.");
                         break;
                     case 1:
                         ++dex;
+                        if (controller.CombatDetails)
+                            controller.Notify($"{Name} increased dexterity.");
                         break;
                     case 2:
                         ++end;
+                        if (controller.CombatDetails)
+                            controller.Notify($"{Name} increased endurance.");
                         break;
                 }
                 RecalculateHp();

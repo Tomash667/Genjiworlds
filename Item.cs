@@ -1,4 +1,4 @@
-﻿using System;
+﻿using Genjiworlds.Helpers;
 
 namespace Genjiworlds
 {
@@ -9,14 +9,18 @@ namespace Genjiworlds
             "club",
             "sword",
             "battle axe",
-            "magic sword"
+            "magic sword",
+            "flame axe",
+            "ultimate sword"
         };
-        public static Tuple<int, int>[] weapon_dmg =
+        public static Range[] weapon_dmg =
         {
-            new Tuple<int, int>(1, 4),
-            new Tuple<int, int>(2, 6),
-            new Tuple<int, int>(3, 8),
-            new Tuple<int, int>(5, 9)
+            new Range(1,4),
+            new Range(2,6),
+            new Range(3,8),
+            new Range(5,9),
+            new Range(6,11),
+            new Range(8,14)
         };
 
         public static string[] armor_names =
@@ -24,11 +28,13 @@ namespace Genjiworlds
             "leather",
             "chain",
             "plate",
-            "magic"
+            "magic",
+            "dragon",
+            "ultimate"
         };
 
-        public const int max_item_level = 3;
-        public static int[] item_price = { 50, 200, 1000 };
+        public const int max_item_level = 5;
+        public static int[] item_price = { 50, 200, 800, 2500, 10000 };
         public const int potion_price = 12;
     }
 }

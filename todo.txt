@@ -1,6 +1,7 @@
-﻿v3:
-+ harder enemies
-- ai can get stuck at level (ex 3) - too easy to lose all potions and return to city & then go to next level
+﻿v4:
++ list heroes
++ immortality
+???
 
 + races
 + classes
@@ -10,7 +11,7 @@
 + graveyard
 + artifacts
 + corpse with items
-+ god mode - immortality
 + ranged combat
 + teams
 + stats (oldest, most kills, most exp, monsters kills/killed)
++ lower exp from easy enemies/locations, increase from hard

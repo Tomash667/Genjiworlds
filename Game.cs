@@ -1,4 +1,5 @@
-﻿using Genjiworlds.Unit;
+﻿using Genjiworlds.Stats;
+using Genjiworlds.Unit;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -232,9 +233,11 @@ namespace Genjiworlds
                                         Hero old_watched = watched;
                                         Hero h = new Hero();
                                         watched = h;
-                                        for(int i=0; i<turns; ++i)
+                                        for (int i = 0; i < turns; ++i)
+                                        {
                                             Update();
-                                        turn += turns;
+                                            ++turn;
+                                        }
                                         watched = old_watched;
                                     }
                                     break;
@@ -342,7 +345,7 @@ namespace Genjiworlds
                                     if (h.dungeon_level > max_dungeon_level)
                                     {
                                         max_dungeon_level = h.dungeon_level;
-                                        journal.Add($"Hero {h.name} reached {h.dungeon_level} dungeon level.");
+                                        journal.Add($"{turn} - Hero {h.name} reached {h.dungeon_level} dungeon level.");
                                     }
                                 }
                                 if (h.target_level == h.dungeon_level && h.ai_order == AiOrder.GotoTarget)
@@ -486,25 +489,36 @@ namespace Genjiworlds
             }
             else if (e == ExploreEvent.Combat)
             {
-                bool win = Combat(h, controller);
+                UnitType enemy = GetCombatEnemy(h.dungeon_level);
+                bool win = Combat(h, controller, enemy);
                 if (watched == null)
                 {
                     string str;
-                    if (Utils.Rand() % 2 == 0)
+                    if (win)
                         str = "won combat";
                     else
                         str = "got killed";
-                    controller.Notify($"{h.Name} was attacked by orc and {str}.");
+                    controller.Notify($"{h.Name} was attacked by {enemy.name} and {str}.");
                 }
                 if (win)
                 {
-                    int reward = Utils.Random(20, 40);
+                    int reward = enemy.gold.Random();
                     h.gold += reward;
                     controller.Notify($"{h.Name} takes {reward} gold from corpse.");
-                    h.AddExp(30, controller);
+                    h.AddExp(enemy.exp, controller);
+                    if(!enemy.killed)
+                    {
+                        enemy.killed = true;
+                        journal.Add($"{turn} - Hero {h.name} killed first {enemy.name}.");
+                    }
                 }
-                else if (watched == h && controlled)
-                    pc.Die();
+                else if (watched == h)
+                {
+                    if (controlled)
+                        pc.Die();
+                    else
+                        Utils.Ok();
+                }
             }
             else if (e == ExploreEvent.Treasure)
             {
@@ -560,50 +574,122 @@ namespace Genjiworlds
             }
         }
 
-        bool Combat(Hero h, IUnitController controller)
+        UnitType GetCombatEnemy(int dungeon_level)
+        {
+            string what;
+            switch(dungeon_level)
+            {
+                case 1:
+                    what = Utils.Rand() % 5 <= 2 ? "goblin" : "orc";
+                    break;
+                case 2:
+                    {
+                        int r = Utils.Rand() % 7;
+                        if (r == 0)
+                            what = "goblin";
+                        else if (r <= 3)
+                            what = "orc";
+                        else
+                            what = "skeleton";
+                    }
+                    break;
+                case 3:
+                    {
+                        int r = Utils.Rand() % 7;
+                        if (r == 0)
+                            what = "orc";
+                        else if (r <= 3)
+                            what = "skeleton";
+                        else
+                            what = "zombie";
+                    }
+                    break;
+                case 4:
+                    {
+                        int r = Utils.Rand() % 7;
+                        if (r == 0)
+                            what = "skeleton";
+                        else if (r <= 3)
+                            what = "zombie";
+                        else
+                            what = "orc warrior";
+                    }
+                    break;
+                case 5:
+                    {
+                        int r = Utils.Rand() % 7;
+                        if (r == 0)
+                            what = "zombie";
+                        else if (r <= 3)
+                            what = "orc warrior";
+                        else
+                            what = "demon";
+                    }
+                    break;
+                case 6:
+                    {
+                        int r = Utils.Rand() % 5;
+                        if (r <= 1)
+                            what = "orc warrior";
+                        else
+                            what = "demon";
+                    }
+                    break;
+                default:
+                    what = "demon";
+                    break;
+            }
+
+            return UnitType.Get(what);
+        }
+
+        bool Combat(Hero h, IUnitController controller, UnitType enemy)
         {
             bool details = controller.CombatDetails;
             if (details)
-                controller.Notify($"{h.Name} was attacked by orc.");
+                controller.Notify($"{h.Name} was attacked by {enemy.name}.");
             int player_ini = Utils.Random(1, 10) + h.dex,
-                enemy_ini = Utils.Random(1, 10);
+                enemy_ini = Utils.Random(1, 10) + enemy.ini;
             bool hero_turn = player_ini >= enemy_ini;
-            int enemy_hp = 10;
+            int enemy_hp = enemy.hp;
             while (true)
             {
                 if (hero_turn)
                 {
                     int attack = Utils.Random(1, 10) + h.dex;
-                    if (attack > 5)
+                    if (attack > 5 + enemy.defense)
                     {
-                        int dmg = Utils.Random(Item.weapon_dmg[h.weapon]) + h.str;
+                        int dmg = Item.weapon_dmg[h.weapon].Random() + h.str;
+                        dmg -= enemy.protection;
+                        if (dmg <= 1)
+                            dmg = 1;
                         enemy_hp -= dmg;
                         if (enemy_hp <= 0)
                         {
                             if (details)
-                                controller.Notify($"{h.Name} attacks orc for {dmg} damage and kills him.");
+                                controller.Notify($"{h.Name} attacks {enemy.name} for {dmg} damage and kills him.");
                             h.kills++;
                             return true;
                         }
                         else
                         {
                             if (details)
-                                controller.Notify($"{h.Name} attacks orc for {dmg} damage.");
+                                controller.Notify($"{h.Name} attacks {enemy.name} for {dmg} damage.");
                         }
                     }
                     else
                     {
                         if (details)
-                            controller.Notify($"{h.Name} tries to attack orc but misses.");
+                            controller.Notify($"{h.Name} tries to attack {enemy.name} but misses.");
                     }
                     hero_turn = false;
                 }
                 else
                 {
-                    int attack = Utils.Random(1, 10);
+                    int attack = Utils.Random(1, 10) + enemy.attack;
                     if (attack > 5 + h.dex)
                     {
-                        int dmg = Utils.Random(1, 4) - h.armor;
+                        int dmg = enemy.damage.Random() - h.armor;
                         if (dmg < 1)
                             dmg = 1;
                         h.hp -= dmg;
@@ -611,19 +697,19 @@ namespace Genjiworlds
                         {
                             to_remove.Add(h);
                             if (details)
-                                controller.Notify($"Orc attacks {h.NameMid} for {dmg} damage and kills him.");
+                                controller.Notify($"{enemy.Name} attacks {h.NameMid} for {dmg} damage and kills him.");
                             return false;
                         }
                         else
                         {
                             if (details)
-                                controller.Notify($"Orc attacks {h.NameMid} for {dmg} damage.");
+                                controller.Notify($"{enemy.Name} attacks {h.NameMid} for {dmg} damage.");
                         }
                     }
                     else
                     {
                         if (details)
-                            controller.Notify($"Orc tries to attack {h.NameMid} but misses.");
+                            controller.Notify($"{enemy.Name} tries to attack {h.NameMid} but misses.");
                     }
                     hero_turn = true;
                 }
@@ -634,7 +720,7 @@ namespace Genjiworlds
         {
             if (h.level > max_hero_level)
             {
-                journal.Add($"Hero {h.name} gained {h.level} level.");
+                journal.Add($"{turn} - Hero {h.name} gained {h.level} level.");
                 max_hero_level = h.level;
             }
         }

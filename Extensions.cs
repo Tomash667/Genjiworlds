@@ -38,5 +38,10 @@ namespace Genjiworlds
         {
             return SelectByValue(items, f, (value, value2) => value2.CompareTo(value) > 0);
         }
+
+        public static string Capitalize(this string s)
+        {
+            return $"{char.ToUpper(s[0])}{s.Substring(1)}";
+        }
     }
 }
