@@ -67,5 +67,15 @@ namespace Genjiworlds
             }
             return min;
         }
+
+        public static int Ratio(int a, int b)
+        {
+            if (b == 0)
+                return 100;
+            else if (a == 0)
+                return 0;
+
+            return (int)((float)a * 100 / (a + b));
+        }
     }
 }

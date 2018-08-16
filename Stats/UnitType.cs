@@ -8,11 +8,11 @@ namespace Genjiworlds.Stats
         public string name;
         public int hp, attack, defense, protection, ini, exp;
         public Range damage, gold;
-        public bool killed;
+        public int kills, killed;
 
         public string Name => name.Capitalize();
 
-        static readonly UnitType[] types = new UnitType[]
+        public static readonly UnitType[] types = new UnitType[]
         {
             new UnitType
             {
@@ -43,9 +43,9 @@ namespace Genjiworlds.Stats
                 name = "skeleton",
                 hp = 13,
                 ini = 1,
-                attack = 3,
+                attack = 2,
                 damage = new Range(3, 6),
-                defense = 2,
+                defense = 1,
                 protection = 1,
                 gold = new Range(20, 50),
                 exp = 50

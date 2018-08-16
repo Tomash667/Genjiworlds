@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Genjiworlds.Stats;
+using System;
 
 namespace Genjiworlds.Unit
 {

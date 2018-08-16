@@ -1,4 +1,4 @@
-﻿using Genjiworlds;
+﻿using Genjiworlds.Stats;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -16,6 +16,7 @@ namespace Genjiworlds
     {
         public int id;
         public string name;
+        public Race race;
         public int level, exp, exp_need;
         public int str, dex, end;
         public int hp, hpmax;
@@ -67,6 +68,8 @@ namespace Genjiworlds
                         end = 1;
                         break;
                 }
+                race = Race.GetRandom();
+                ApplyRaceBonus(null);
                 BuyItems(false);
             }
             hp = hpmax = CalculateMaxHp();
@@ -113,6 +116,7 @@ namespace Genjiworlds
         {
             f.Write(id);
             f.Write(name);
+            f.Write((int)race.id);
             f.Write(level);
             f.Write(exp);
             f.Write(str);
@@ -136,6 +140,8 @@ namespace Genjiworlds
         {
             id = f.ReadInt32();
             name = f.ReadString();
+            RaceId race_id = (RaceId)f.ReadInt32();
+            race = Race.Get(race_id);
             level = f.ReadInt32();
             exp = f.ReadInt32();
             exp_need = 100 * level;
@@ -170,7 +176,7 @@ namespace Genjiworlds
 
         public void ShowInfo()
         {
-            Console.WriteLine($"{name} [{id}] - inside {Location}, level:{level}, exp:{exp}/{exp_need}\n"
+            Console.WriteLine($"{name} [{id}] - inside {Location}, {race.name}, level:{level}, exp:{exp}/{exp_need}\n"
                 + $"Hp:{hp}/{hpmax}, str:{str}, dex:{dex}, end:{end}\n"
                 + $"Gold:{gold}, weapon:{Item.weapon_names[weapon]}, armor:{Item.armor_names[armor]}, potions:{potions}\n"
                 + $"Age:{age}, kills:{kills}");
@@ -271,6 +277,7 @@ namespace Genjiworlds
             exp_need += 100;
             controller.Notify($"{Name} gained {level} level.");
             Game.instance.LevelUp(this);
+            ApplyRaceBonus(controller);
             if (controlled)
                 gained_level = true;
             else
@@ -341,6 +348,35 @@ namespace Genjiworlds
             ai_order = AiOrder.GotoTarget;
             if (target_level == 1)
                 ai_order = AiOrder.Explore;
+        }
+
+        public void ApplyRaceBonus(IUnitController controller)
+        {
+            if(level == 1 || level % 4 == 0)
+            {
+                Race.Bonus bonus = race.bonus;
+                if (bonus == Race.Bonus.Random)
+                    bonus = (Race.Bonus)(Utils.Rand() % 3);
+                bool notify = controller?.CombatDetails ?? false;
+                switch (race.bonus)
+                {
+                    case Race.Bonus.Str:
+                        ++str;
+                        if(notify)
+                            controller.Notify($"{Name} increased strength.");
+                        break;
+                    case Race.Bonus.Dex:
+                        ++dex;
+                        if (notify)
+                            controller.Notify($"{Name} increased dexterity.");
+                        break;
+                    case Race.Bonus.End:
+                        ++end;
+                        if (notify)
+                            controller.Notify($"{Name} increased endurance.");
+                        break;
+                }
+            }
         }
     }
 }

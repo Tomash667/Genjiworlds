@@ -1,6 +1,6 @@
 ﻿using Genjiworlds.Helpers;
 
-namespace Genjiworlds
+namespace Genjiworlds.Stats
 {
     public static class Item
     {

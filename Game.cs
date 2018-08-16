@@ -85,14 +85,14 @@ namespace Genjiworlds
                 char c = Console.ReadKey(true).KeyChar;
                 switch (c)
                 {
-                    case 'q':
+                    case 'Q':
                         quit = true;
                         return true;
                     case 'h':
                     case '?':
-                        Console.WriteLine("h-help, c-create hero, t-take control, w-watch hero, v-view hero, j-journal, s-save, l-load, r-restart, q-quit, @-cheats");
+                        Console.WriteLine("h-help, c-create hero, t-take control, w-watch hero, v-view hero, j-journal, s-stats, S-save, L-load, R-restart, Q-quit, @-cheats");
                         break;
-                    case 'r':
+                    case 'R':
                         if (controlled)
                             controlled_quit = true;
                         Init();
@@ -149,10 +149,10 @@ namespace Genjiworlds
                         else
                             watched.ShowInfo();
                         break;
-                    case 's':
+                    case 'S':
                         Save();
                         break;
-                    case 'l':
+                    case 'L':
                         if (controlled)
                             controlled_quit = true;
                         while (true)
@@ -195,6 +195,22 @@ namespace Genjiworlds
                                 name = name,
                                 controlled = true
                             };
+                            Console.WriteLine("Pick race:");
+                            int index = 1;
+                            StringBuilder choices = new StringBuilder("r");
+                            foreach(Race race in Race.races)
+                            {
+                                Console.WriteLine($"{index}. {race.name} ({race.desc})");
+                                ++index;
+                                choices.Append($"{index}");
+                            }
+                            Console.WriteLine("r. random\n>");
+                            char rc = Utils.ReadKey(choices.ToString());
+                            if (rc == 'r')
+                                h.race = Race.GetRandom();
+                            else
+                                h.race = Race.races[rc - '1'];
+                            h.ApplyRaceBonus(null);
                             h.PickAttribute();
                             heroes.Add(h);
                             watched = h;
@@ -259,6 +275,22 @@ namespace Genjiworlds
                                     Console.WriteLine($"Unknown cheat '{strs[0]}'.");
                                     break;
                             }
+                        }
+                        break;
+                    case 's':
+                        {
+                            Console.WriteLine("=== Stats ===");
+                            bool any = false;
+                            foreach(UnitType unit in UnitType.types)
+                            {
+                                if(unit.kills != 0 || unit.killed != 0)
+                                {
+                                    Console.WriteLine($"{unit.name}, killed {unit.killed}, kills {unit.kills}, win ratio {Utils.Ratio(unit.killed, unit.kills)}%");
+                                    any = true;
+                                }
+                            }
+                            if (!any)
+                                Console.WriteLine("(empty)");
                         }
                         break;
                 }
@@ -515,18 +547,20 @@ namespace Genjiworlds
                     h.gold += reward;
                     controller.Notify($"{h.Name} takes {reward} gold from corpse.");
                     h.AddExp(enemy.exp, controller);
-                    if(!enemy.killed)
-                    {
-                        enemy.killed = true;
+                    if (enemy.killed == 0)
                         journal.Add($"{turn} - Hero {h.name} killed first {enemy.name}.");
-                    }
+                    enemy.killed++;
                 }
-                else if (watched == h)
+                else
                 {
-                    if (controlled)
-                        pc.Die();
-                    else
-                        Utils.Ok();
+                    enemy.kills++;
+                    if (watched == h)
+                    {
+                        if (controlled)
+                            pc.Die();
+                        else
+                            Utils.Ok();
+                    }
                 }
             }
             else if (e == ExploreEvent.Treasure)
@@ -757,6 +791,11 @@ namespace Genjiworlds
                         h.Save(f);
                     f.Write(watched?.id ?? -1);
                     f.Write(controlled);
+                    foreach(UnitType unit in UnitType.types)
+                    {
+                        f.Write(unit.killed);
+                        f.Write(unit.kills);
+                    }
                     f.Write(file_end_sign);
                 }
                 Console.WriteLine("Save completed.");
@@ -811,6 +850,14 @@ namespace Genjiworlds
                     controlled = f.ReadBoolean();
                     if (watched != null && controlled)
                         watched.controlled = true;
+                    foreach(UnitType unit in UnitType.types)
+                    {
+                        unit.killed = f.ReadInt32();
+                        unit.kills = f.ReadInt32();
+                    }
+                    byte eof_sign = f.ReadByte();
+                    if (eof_sign != file_end_sign)
+                        throw new Exception("Missing end of file signature.");
                     first_turn = true;
                     return LoadResult.Ok;
                 }
