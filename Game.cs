@@ -15,7 +15,7 @@ namespace Genjiworlds
         List<Hero> heroes = new List<Hero>();
         List<Hero> to_remove = new List<Hero>();
         List<string> journal = new List<string>();
-        Hero watched;
+        Hero watched, chempion;
         bool quit, first_turn, controlled, controlled_quit, controlled_die;
         static readonly int[] spawn_rate = { 20, 10, 5 };
         static readonly byte[] save_sign = { (byte)'G', (byte)'E', (byte)'N', (byte)'J' };
@@ -48,15 +48,11 @@ namespace Genjiworlds
                 {
                     if (watched == null)
                     {
-                        Hero oldest = heroes.Where(x => x.age > 0).MaxBy(x => x.age);
-                        string oldest_str = "";
-                        if (oldest != null)
-                            oldest_str = $", oldest {oldest.name} (age {oldest.age})";
-                        Hero winner = heroes.Where(x => x.kills > 0).MaxBy(x => x.kills);
-                        string winner_str = "";
-                        if (winner != null)
-                            winner_str = $", winner {winner.name} (kills {winner.kills})";
-                        Console.WriteLine($"Turn {turn}, heroes {heroes.Count}{oldest_str}{winner_str}");
+                        Hero best = heroes.OrderByDescending(x => x.level).ThenByDescending(x => x.exp).FirstOrDefault();
+                        string best_str = "";
+                        if (best != null)
+                            best_str = $", best hero {best.name} (level {best.level})";
+                        Console.WriteLine($"Turn {turn}, heroes {heroes.Count}{best_str}");
                     }
                     else if (!controlled)
                     {
@@ -90,7 +86,7 @@ namespace Genjiworlds
                         return true;
                     case 'h':
                     case '?':
-                        Console.WriteLine("h-help, c-create hero, t-take control, w-watch hero, v-view hero, j-journal, s-stats, S-save, L-load, R-restart, Q-quit, @-cheats");
+                        Console.WriteLine("h-help, c-create hero, t-take control, w-watch hero, v-view hero, l-list heroes, j-journal, s-stats, S-save, L-load, R-restart, Q-quit, @-cheats");
                         break;
                     case 'R':
                         if (controlled)
@@ -280,6 +276,15 @@ namespace Genjiworlds
                     case 's':
                         {
                             Console.WriteLine("=== Stats ===");
+                            Hero oldest = heroes.Where(x => x.age > 0).MaxBy(x => x.age);
+                            if (oldest != null)
+                                Console.WriteLine($"Oldest hero: {oldest.Name} (age {oldest.age})");
+                            Hero killer = heroes.Where(x => x.kills > 0).MaxBy(x => x.kills);
+                            if (killer != null)
+                                Console.WriteLine($"Killer hero: {killer.Name} (kills {killer.kills})");
+                            Hero expert = heroes.OrderByDescending(x => x.level).ThenByDescending(x => x.exp).FirstOrDefault();
+                            if (expert != null)
+                                Console.WriteLine($"Expert hero: {expert.name} (level {expert.level}, exp {expert.ExpP}%)");
                             bool any = false;
                             foreach(UnitType unit in UnitType.types)
                             {
@@ -292,6 +297,13 @@ namespace Genjiworlds
                             if (!any)
                                 Console.WriteLine("(empty)");
                         }
+                        break;
+                    case 'l':
+                        Console.WriteLine("=== Heroes ===");
+                        foreach (Hero h in heroes)
+                            Console.WriteLine($"{h.name} - level {h.level}, {h.Location}, {h.race.name}, age {h.age}");
+                        if (heroes.Count == 0)
+                            Console.WriteLine("(empty)");
                         break;
                 }
             }
@@ -385,6 +397,7 @@ namespace Genjiworlds
                                     {
                                         max_dungeon_level = h.dungeon_level;
                                         journal.Add($"{turn} - Hero {h.name} reached {h.dungeon_level} dungeon level.");
+                                        chempion = h;
                                     }
                                 }
                                 if (h.target_level == h.dungeon_level && h.ai_order == AiOrder.GotoTarget)
@@ -437,6 +450,11 @@ namespace Genjiworlds
 
             foreach (Hero h in to_remove)
             {
+                if (h == chempion)
+                {
+                    journal.Add($"{turn} - Champion {h.name} killed by {(h.killer?.name ?? "trap")} at {h.Location}.");
+                    chempion = null;
+                }
                 if (h == watched)
                 {
                     watched.controlled = false;
@@ -493,7 +511,7 @@ namespace Genjiworlds
                 controller.Notify($"{h.Name} explores dungeon.");
 
             if (e == ExploreEvent.Nothing)
-                h.AddExp(1, controller);
+                h.AddExp(h.dungeon_level / h.level, controller);
             else if (e == ExploreEvent.Trap)
             {
                 int attack = Utils.Random(1, 10) - h.dex;
@@ -519,13 +537,13 @@ namespace Genjiworlds
                     else
                     {
                         controller.Notify($"{h.Name} takes {dmg} damage from trap.");
-                        h.AddExp(5, controller);
+                        h.AddExp(5 * h.dungeon_level / h.level, controller);
                     }
                 }
                 else
                 {
                     controller.Notify($"{h.Name} dodged trap.");
-                    h.AddExp(5, controller);
+                    h.AddExp(5 * h.dungeon_level / h.level, controller);
                 }
             }
             else if (e == ExploreEvent.Combat)
@@ -546,13 +564,14 @@ namespace Genjiworlds
                     int reward = enemy.gold.Random();
                     h.gold += reward;
                     controller.Notify($"{h.Name} takes {reward} gold from corpse.");
-                    h.AddExp(enemy.exp, controller);
+                    h.AddExp(enemy.CalculateExp(h.level), controller);
                     if (enemy.killed == 0)
                         journal.Add($"{turn} - Hero {h.name} killed first {enemy.name}.");
                     enemy.killed++;
                 }
                 else
                 {
+                    h.killer = enemy;
                     enemy.kills++;
                     if (watched == h)
                     {
@@ -607,83 +626,38 @@ namespace Genjiworlds
                         break;
                 }
                 controller.Notify($"{h.Name} finds {what}.");
-                h.AddExp(5, controller);
+                h.AddExp(5 * h.dungeon_level / h.level, controller);
             }
             else if (e == ExploreEvent.Stairs)
             {
                 h.know_down_stairs = true;
                 controller.Notify($"{h.Name} finds stairs to lower level.");
-                h.AddExp(5, controller);
+                h.AddExp(5 * h.dungeon_level / h.level, controller);
             }
         }
 
         UnitType GetCombatEnemy(int dungeon_level)
         {
-            string what;
-            switch(dungeon_level)
+            UnitType[] targets = UnitType.types.Where(x => x.level <= dungeon_level && x.level + 2 >= dungeon_level).ToArray();
+            switch (targets.Length)
             {
+                case 0:
+                    return UnitType.types.Last();
                 case 1:
-                    what = Utils.Rand() % 5 <= 2 ? "goblin" : "orc";
-                    break;
+                    return targets[0];
                 case 2:
-                    {
-                        int r = Utils.Rand() % 7;
-                        if (r == 0)
-                            what = "goblin";
-                        else if (r <= 3)
-                            what = "orc";
-                        else
-                            what = "skeleton";
-                    }
-                    break;
-                case 3:
-                    {
-                        int r = Utils.Rand() % 7;
-                        if (r == 0)
-                            what = "orc";
-                        else if (r <= 3)
-                            what = "skeleton";
-                        else
-                            what = "zombie";
-                    }
-                    break;
-                case 4:
-                    {
-                        int r = Utils.Rand() % 7;
-                        if (r == 0)
-                            what = "skeleton";
-                        else if (r <= 3)
-                            what = "zombie";
-                        else
-                            what = "orc warrior";
-                    }
-                    break;
-                case 5:
-                    {
-                        int r = Utils.Rand() % 7;
-                        if (r == 0)
-                            what = "zombie";
-                        else if (r <= 3)
-                            what = "orc warrior";
-                        else
-                            what = "demon";
-                    }
-                    break;
-                case 6:
-                    {
-                        int r = Utils.Rand() % 5;
-                        if (r <= 1)
-                            what = "orc warrior";
-                        else
-                            what = "demon";
-                    }
-                    break;
+                    return targets[Utils.Rand() % 5 <= 2 ? 0 : 1];
                 default:
-                    what = "demon";
-                    break;
+                    {
+                        int r = Utils.Rand() % 7;
+                        if (r == 0)
+                            return targets[0];
+                        else if (r <= 3)
+                            return targets[1];
+                        else
+                            return targets[2];
+                    }
             }
-
-            return UnitType.Get(what);
         }
 
         bool Combat(Hero h, IUnitController controller, UnitType enemy)
@@ -767,6 +741,7 @@ namespace Genjiworlds
             {
                 journal.Add($"{turn} - Hero {h.name} gained {h.level} level.");
                 max_hero_level = h.level;
+                chempion = h;
             }
         }
 
@@ -796,6 +771,7 @@ namespace Genjiworlds
                         f.Write(unit.killed);
                         f.Write(unit.kills);
                     }
+                    f.Write(chempion?.id ?? -1);
                     f.Write(file_end_sign);
                 }
                 Console.WriteLine("Save completed.");
@@ -855,6 +831,11 @@ namespace Genjiworlds
                         unit.killed = f.ReadInt32();
                         unit.kills = f.ReadInt32();
                     }
+                    int chempion_id = f.ReadInt32();
+                    if (chempion_id == -1)
+                        chempion = null;
+                    else
+                        chempion = heroes.Single(x => x.id == chempion_id);
                     byte eof_sign = f.ReadByte();
                     if (eof_sign != file_end_sign)
                         throw new Exception("Missing end of file signature.");

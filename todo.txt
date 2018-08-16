@@ -1,6 +1,4 @@
 ﻿v4:
-+ list heroes
-+ lower exp from easy enemies/locations, increase from hard
 ???
 
 + classes
@@ -12,4 +10,3 @@
 + corpse with items
 + ranged combat
 + teams
-+ stats (oldest, most kills, most exp)

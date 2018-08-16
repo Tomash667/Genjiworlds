@@ -28,6 +28,7 @@ namespace Genjiworlds
         public AiOrder ai_order;
         public bool know_down_stairs, controlled, immortal;
         // temporary
+        public UnitType killer;
         public bool gained_level;
 
         public const int max_potions = 5;
@@ -41,6 +42,7 @@ namespace Genjiworlds
         {
             get { return controlled ? "you" : name; }
         }
+        public int ExpP => (int)((float)exp * 100 / exp_need);
 
         public Hero()
         {
