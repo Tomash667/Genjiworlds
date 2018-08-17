@@ -122,10 +122,12 @@ namespace Genjiworlds.Unit
                     Console.WriteLine($"w - {Item.weapon_names[h.weapon + 1]} ({Item.item_price[h.weapon]} gold)");
                 if (h.armor != Item.max_item_level)
                     Console.WriteLine($"a - {Item.armor_names[h.armor + 1]} ({Item.item_price[h.armor]} gold)");
+                if (h.bow != Item.max_item_level)
+                    Console.WriteLine($"b - {Item.bow_names[h.bow + 1]} ({Item.item_price[h.bow]} gold)");
                 if (h.potions != Hero.max_potions)
                     Console.WriteLine($"p - potion ({Item.potion_price} gold)");
                 Console.WriteLine("x - exit shop");
-                char c = Utils.ReadKey("wapx");
+                char c = Utils.ReadKey("wabpx");
                 switch (c)
                 {
                     case 'w':
@@ -157,6 +159,25 @@ namespace Genjiworlds.Unit
                                 h.gold -= price;
                                 ++h.armor;
                                 Console.WriteLine($"You bought {Item.armor_names[h.armor]}.");
+                                Utils.Ok();
+                            }
+                            else
+                            {
+                                Console.WriteLine("Not enought gold.");
+                                Utils.Ok();
+                            }
+                        }
+                        break;
+                    case 'b':
+                        if (h.bow != Item.max_item_level)
+                        {
+                            int price = Item.item_price[h.bow];
+                            if (h.gold >= price)
+                            {
+                                bought = true;
+                                h.gold -= price;
+                                ++h.bow;
+                                Console.WriteLine($"You bought {Item.bow_names[h.bow]}.");
                                 Utils.Ok();
                             }
                             else

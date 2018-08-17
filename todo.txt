@@ -1,12 +1,19 @@
 ﻿v4:
-???
-
-+ classes
++ ai - have enough gold - return to city
++ hero classes:
+	* warrior (heavy armor, weapon, shield)
+	* duelist (light armor, two weapons)
+	* ranger (bow, light armor, single weapon)
+	* fighter (heavy armor, two handed weapon)
++ light armor, two weapons, two handed weapon, shield
++ healer
++ teams, monster teams
 + quests
+
 + magic items
 + more locations
 + graveyard
 + artifacts
 + corpse with items
-+ ranged combat
-+ teams
++ enemy ranged protection, defense
++ unit move speed

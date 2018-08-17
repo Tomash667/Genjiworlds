@@ -490,8 +490,7 @@ namespace Genjiworlds
         enum Treasure
         {
             GoldPile,
-            Weapon,
-            Armor,
+            Item,
             Potions,
             GoldTreasure,
             Max
@@ -585,9 +584,11 @@ namespace Genjiworlds
             else if (e == ExploreEvent.Treasure)
             {
                 Treasure t = (Treasure)(Utils.Rand() % (int)Treasure.Max);
-                string what;
-                if ((t == Treasure.Weapon && (h.weapon == Item.max_item_level || h.weapon == h.dungeon_level))
-                    || (t == Treasure.Armor && (h.armor == Item.max_item_level || h.armor == h.dungeon_level))
+                string what = null;
+                if ((t == Treasure.Item
+                        && (h.weapon == Item.max_item_level || h.weapon == h.dungeon_level)
+                        && (h.armor == Item.max_item_level || h.armor == h.dungeon_level)
+                        && (h.bow == Item.max_item_level || h.bow == h.dungeon_level))
                     || (t == Treasure.Potions && h.potions == Hero.max_potions && h.hp == h.hpmax))
                     t = Treasure.GoldPile;
                 switch (t)
@@ -600,13 +601,43 @@ namespace Genjiworlds
                             h.gold += count;
                         }
                         break;
-                    case Treasure.Weapon:
-                        h.weapon++;
-                        what = Item.weapon_names[h.weapon];
-                        break;
-                    case Treasure.Armor:
-                        h.armor++;
-                        what = $"{Item.armor_names[h.armor]} armor";
+                    case Treasure.Item:
+                        {
+                            ItemType itemType = (ItemType)(Utils.Rand() % 3);
+                            while (what == null)
+                            {
+                                switch (itemType)
+                                {
+                                    case ItemType.Weapon:
+                                        if (h.weapon == Item.max_item_level || h.weapon == h.dungeon_level)
+                                            itemType = (ItemType)((int)(itemType + 1) % 3);
+                                        else
+                                        {
+                                            h.weapon++;
+                                            what = Item.weapon_names[h.weapon];
+                                        }
+                                        break;
+                                    case ItemType.Armor:
+                                        if (h.armor == Item.max_item_level || h.armor == h.dungeon_level)
+                                            itemType = (ItemType)((int)(itemType + 1) % 3);
+                                        else
+                                        {
+                                            h.armor++;
+                                            what = $"{Item.armor_names[h.armor]} armor";
+                                        }
+                                        break;
+                                    case ItemType.Bow:
+                                        if (h.bow == Item.max_item_level || h.bow == h.dungeon_level)
+                                            itemType = (ItemType)((int)(itemType + 1) % 3);
+                                        else
+                                        {
+                                            h.bow++;
+                                            what = Item.bow_names[h.bow];
+                                        }
+                                        break;
+                                }
+                            }
+                        }
                         break;
                     case Treasure.Potions:
                         h.potions += 2;
@@ -665,6 +696,11 @@ namespace Genjiworlds
             bool details = controller.CombatDetails;
             if (details)
                 controller.Notify($"{h.Name} was attacked by {enemy.name}.");
+            int dist;
+            if (h.bow == 0)
+                dist = 0;
+            else
+                dist = Utils.Random(0, 2);
             int player_ini = Utils.Random(1, 10) + h.dex,
                 enemy_ini = Utils.Random(1, 10) + enemy.ini;
             bool hero_turn = player_ini >= enemy_ini;
@@ -673,62 +709,121 @@ namespace Genjiworlds
             {
                 if (hero_turn)
                 {
-                    int attack = Utils.Random(1, 10) + h.dex;
-                    if (attack > 5 + enemy.defense)
+                    if (dist > 0)
                     {
-                        int dmg = Item.weapon_dmg[h.weapon].Random() + h.str;
-                        dmg -= enemy.protection;
-                        if (dmg <= 1)
-                            dmg = 1;
-                        enemy_hp -= dmg;
-                        if (enemy_hp <= 0)
+                        if (h.bow == 0)
                         {
-                            if (details)
-                                controller.Notify($"{h.Name} attacks {enemy.name} for {dmg} damage and kills him.");
-                            h.kills++;
-                            return true;
+                            if (dist == 1 && Utils.Rand() % 2 == 0)
+                            {
+                                if (details)
+                                    controller.Notify($"{h.Name} waits for enemy.");
+                            }
+                            else
+                            {
+                                if (details)
+                                    controller.Notify($"{h.Name} moves forward {enemy.name}.");
+                                --dist;
+                            }
                         }
                         else
                         {
-                            if (details)
-                                controller.Notify($"{h.Name} attacks {enemy.name} for {dmg} damage.");
+                            int attack = Utils.Random(1, 10) + h.dex;
+                            if (attack > 5 + enemy.defense)
+                            {
+                                int dmg = Item.bow_dmg[h.bow].Random() + h.dex;
+                                dmg -= enemy.protection;
+                                if (dmg <= 1)
+                                    dmg = 1;
+                                enemy_hp -= dmg;
+                                if (enemy_hp <= 0)
+                                {
+                                    if (details)
+                                        controller.Notify($"{h.Name} shoots {enemy.name} for {dmg} damage and kills him.");
+                                    h.kills++;
+                                    return true;
+                                }
+                                else
+                                {
+                                    if (details)
+                                        controller.Notify($"{h.Name} shoot {enemy.name} for {dmg} damage.");
+                                }
+                            }
+                            else
+                            {
+                                if (details)
+                                    controller.Notify($"{h.Name} tries to shoot {enemy.name} but misses.");
+                            }
                         }
                     }
                     else
                     {
-                        if (details)
-                            controller.Notify($"{h.Name} tries to attack {enemy.name} but misses.");
+                        int attack = Utils.Random(1, 10) + h.dex;
+                        if (attack > 5 + enemy.defense)
+                        {
+                            int dmg = Item.weapon_dmg[h.weapon].Random() + h.str;
+                            dmg -= enemy.protection;
+                            if (dmg <= 1)
+                                dmg = 1;
+                            enemy_hp -= dmg;
+                            if (enemy_hp <= 0)
+                            {
+                                if (details)
+                                    controller.Notify($"{h.Name} attacks {enemy.name} for {dmg} damage and kills him.");
+                                h.kills++;
+                                return true;
+                            }
+                            else
+                            {
+                                if (details)
+                                    controller.Notify($"{h.Name} attacks {enemy.name} for {dmg} damage.");
+                            }
+                        }
+                        else
+                        {
+                            if (details)
+                                controller.Notify($"{h.Name} tries to attack {enemy.name} but misses.");
+                        }
                     }
                     hero_turn = false;
                 }
                 else
                 {
-                    int attack = Utils.Random(1, 10) + enemy.attack;
-                    if (attack > 5 + h.dex)
+                    if (dist > 0)
                     {
-                        int dmg = enemy.damage.Random() - h.armor;
-                        if (dmg < 1)
-                            dmg = 1;
-                        h.hp -= dmg;
-                        if (h.immortal && h.hp < 1)
-                            h.hp = 1;
-                        if (h.hp <= 0)
+                        if (details)
+                            controller.Notify($"{enemy.Name} moves forward {h.NameMid}.");
+                        --dist;
+                    }
+                    else
+                    {
+                        int attack = Utils.Random(1, 10) + enemy.attack;
+                        if (attack > 5 + h.dex)
                         {
-                            to_remove.Add(h);
-                            if (details)
-                                controller.Notify($"{enemy.Name} attacks {h.NameMid} for {dmg} damage and kills him.");
-                            return false;
+                            int dmg = enemy.damage.Random() - h.armor;
+                            if (dmg < 1)
+                                dmg = 1;
+                            h.hp -= dmg;
+                            if (h.immortal && h.hp < 1)
+                                h.hp = 1;
+                            if (h.hp <= 0)
+                            {
+                                to_remove.Add(h);
+                                if (details)
+                                    controller.Notify($"{enemy.Name} attacks {h.NameMid} for {dmg} damage and kills him.");
+                                return false;
+                            }
+                            else
+                            {
+                                if (details)
+                                    controller.Notify($"{enemy.Name} attacks {h.NameMid} for {dmg} damage.");
+                            }
                         }
                         else
                         {
                             if (details)
-                                controller.Notify($"{enemy.Name} attacks {h.NameMid} for {dmg} damage.");
+                                controller.Notify($"{enemy.Name} tries to attack {h.NameMid} but misses.");
                         }
-                    }
-                    else
-                    {
-                        if (details)
-                            controller.Notify($"{enemy.Name} tries to attack {h.NameMid} but misses.");
+
                     }
                     hero_turn = true;
                 }

@@ -2,6 +2,13 @@
 
 namespace Genjiworlds.Stats
 {
+    public enum ItemType
+    {
+        Weapon,
+        Armor,
+        Bow
+    }
+
     public static class Item
     {
         public static string[] weapon_names =
@@ -31,6 +38,25 @@ namespace Genjiworlds.Stats
             "magic",
             "dragon",
             "ultimate"
+        };
+
+        public static string[] bow_names =
+        {
+            "(none)",
+            "short bow",
+            "long bow",
+            "composite bow",
+            "elven bow",
+            "ultimate bow"
+        };
+        public static Range[] bow_dmg =
+        {
+            new Range(1,4),
+            new Range(2,5),
+            new Range(3,6),
+            new Range(4,7),
+            new Range(5,8),
+            new Range(6,9)
         };
 
         public const int max_item_level = 5;

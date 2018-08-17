@@ -20,13 +20,13 @@ namespace Genjiworlds
         public int level, exp, exp_need;
         public int str, dex, end;
         public int hp, hpmax;
-        public int weapon, armor;
+        public int weapon, armor, bow;
         public int gold;
         public int potions;
         public int age, kills;
         public int dungeon_level, lowest_level, target_level;
         public AiOrder ai_order;
-        public bool know_down_stairs, controlled, immortal;
+        public bool know_down_stairs, controlled, immortal, bowman;
         // temporary
         public UnitType killer;
         public bool gained_level;
@@ -53,6 +53,7 @@ namespace Genjiworlds
             this.id = id;
             level = 1;
             exp_need = 100;
+            bowman = Utils.Rand() % 3 == 0;
             gold = Utils.Random(30, 60);
             if (!custom)
             {
@@ -127,6 +128,7 @@ namespace Genjiworlds
             f.Write(hp);
             f.Write(weapon);
             f.Write(armor);
+            f.Write(bow);
             f.Write(gold);
             f.Write(potions);
             f.Write(age);
@@ -136,6 +138,7 @@ namespace Genjiworlds
             f.Write(target_level);
             f.Write(know_down_stairs);
             f.Write(immortal);
+            f.Write(bowman);
         }
 
         public void Load(BinaryReader f)
@@ -154,6 +157,7 @@ namespace Genjiworlds
             hpmax = CalculateMaxHp();
             weapon = f.ReadInt32();
             armor = f.ReadInt32();
+            bow = f.ReadInt32();
             gold = f.ReadInt32();
             potions = f.ReadInt32();
             age = f.ReadInt32();
@@ -163,6 +167,7 @@ namespace Genjiworlds
             target_level = f.ReadInt32();
             know_down_stairs = f.ReadBoolean();
             immortal = f.ReadBoolean();
+            bowman = f.ReadBoolean();
         }
 
         public string Location
@@ -180,7 +185,7 @@ namespace Genjiworlds
         {
             Console.WriteLine($"{name} [{id}] - inside {Location}, {race.name}, level:{level}, exp:{exp}/{exp_need}\n"
                 + $"Hp:{hp}/{hpmax}, str:{str}, dex:{dex}, end:{end}\n"
-                + $"Gold:{gold}, weapon:{Item.weapon_names[weapon]}, armor:{Item.armor_names[armor]}, potions:{potions}\n"
+                + $"Gold:{gold}, weapon:{Item.weapon_names[weapon]}, armor:{Item.armor_names[armor]}, bow:{Item.bow_names[bow]}, potions:{potions}\n"
                 + $"Age:{age}, kills:{kills}");
         }
 
@@ -199,36 +204,52 @@ namespace Genjiworlds
             }
 
             // weapon & armor
-            bool check_weapon = Utils.Rand() % 2 == 0;
-            for (int i = 0; i < 2; ++i)
+            int lowest_item = Utils.Min(weapon, armor, bow);
+            if (lowest_item < Item.max_item_level && gold >= Item.item_price[lowest_item])
             {
-                if (check_weapon)
+                ItemType[] to_buy = GetBuyList();
+                for(int i=0; i<to_buy.Length; ++i)
                 {
-                    if (weapon < Item.max_item_level)
+                    switch(to_buy[i])
                     {
-                        int price = Item.item_price[weapon];
-                        if (gold >= price)
-                        {
-                            ++weapon;
-                            bought_items.Add(Item.weapon_names[weapon]);
-                            gold -= price;
-                        }
+                        case ItemType.Weapon:
+                            if (weapon < Item.max_item_level)
+                            {
+                                int price = Item.item_price[weapon];
+                                if (gold >= price)
+                                {
+                                    ++weapon;
+                                    bought_items.Add(Item.weapon_names[weapon]);
+                                    gold -= price;
+                                }
+                            }
+                            break;
+                        case ItemType.Armor:
+                            if (armor < Item.max_item_level)
+                            {
+                                int price = Item.item_price[armor];
+                                if (gold >= price)
+                                {
+                                    ++armor;
+                                    bought_items.Add(Item.armor_names[armor]);
+                                    gold -= price;
+                                }
+                            }
+                            break;
+                        case ItemType.Bow:
+                            if (bow < Item.max_item_level)
+                            {
+                                int price = Item.item_price[bow];
+                                if (gold >= price)
+                                {
+                                    ++bow;
+                                    bought_items.Add(Item.bow_names[bow]);
+                                    gold -= price;
+                                }
+                            }
+                            break;
                     }
                 }
-                else
-                {
-                    if (armor < Item.max_item_level)
-                    {
-                        int price = Item.item_price[armor];
-                        if (gold >= price)
-                        {
-                            ++armor;
-                            bought_items.Add(Item.armor_names[armor]);
-                            gold -= price;
-                        }
-                    }
-                }
-                check_weapon = !check_weapon;
             }
 
             // more potions
@@ -255,6 +276,40 @@ namespace Genjiworlds
                 Console.WriteLine($"{name} bought {Utils.FormatList(bought_items)}.");
 
             return bought_items.Count > 0;
+        }
+
+        public ItemType[] GetBuyList()
+        {
+            ItemType[] to_buy = new ItemType[3];
+            if(bowman)
+            {
+                to_buy[0] = ItemType.Bow;
+                if(Utils.Rand() % 2 == 0)
+                {
+                    to_buy[1] = ItemType.Weapon;
+                    to_buy[2] = ItemType.Armor;
+                }
+                else
+                {
+                    to_buy[2] = ItemType.Armor;
+                    to_buy[1] = ItemType.Weapon;
+                }
+            }
+            else
+            {
+                if (Utils.Rand() % 2 == 0)
+                {
+                    to_buy[0] = ItemType.Weapon;
+                    to_buy[1] = ItemType.Armor;
+                }
+                else
+                {
+                    to_buy[0] = ItemType.Armor;
+                    to_buy[1] = ItemType.Weapon;
+                }
+                to_buy[2] = ItemType.Bow;
+            }
+            return to_buy;
         }
 
         public int CalculateMaxHp()
