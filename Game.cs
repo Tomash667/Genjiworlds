@@ -184,35 +184,11 @@ namespace Genjiworlds
                         {
                             if (controlled)
                                 controlled_quit = true;
-                            Console.Write("Hero name: ");
-                            string name = Console.ReadLine();
-                            Hero h = new Hero(next_id++, true)
-                            {
-                                name = name,
-                                controlled = true
-                            };
-                            Console.WriteLine("Pick race:");
-                            int index = 1;
-                            StringBuilder choices = new StringBuilder("r");
-                            foreach(Race race in Race.races)
-                            {
-                                Console.WriteLine($"{index}. {race.name} ({race.desc})");
-                                ++index;
-                                choices.Append($"{index}");
-                            }
-                            Console.WriteLine("r. random\n>");
-                            char rc = Utils.ReadKey(choices.ToString());
-                            if (rc == 'r')
-                                h.race = Race.GetRandom();
-                            else
-                                h.race = Race.races[rc - '1'];
-                            h.ApplyRaceBonus(null);
-                            h.PickAttribute();
-                            heroes.Add(h);
+                            Hero h = CreateCharacter();
                             watched = h;
                             controlled = true;
                             pc.Clear();
-                            Console.WriteLine($"Controlling {name}.");
+                            Console.WriteLine($"Controlling {h.name}.");
                             if (controlled_quit)
                                 return true;
                         }
@@ -301,12 +277,63 @@ namespace Genjiworlds
                     case 'l':
                         Console.WriteLine("=== Heroes ===");
                         foreach (Hero h in heroes)
-                            Console.WriteLine($"{h.name} - level {h.level}, {h.Location}, {h.race.name}, age {h.age}");
+                            Console.WriteLine($"{h.name} - level {h.level}, {h.Location}, {h.race.name} {h.clas.name}, age {h.age}");
                         if (heroes.Count == 0)
                             Console.WriteLine("(empty)");
                         break;
                 }
             }
+        }
+
+        Hero CreateCharacter()
+        {
+            // name
+            Console.Write("Hero name: ");
+            string name = Console.ReadLine();
+            Hero h = new Hero(next_id++, true)
+            {
+                name = name,
+                controlled = true
+            };
+
+            // race
+            Console.WriteLine("Pick race:");
+            int index = 1;
+            StringBuilder choices = new StringBuilder("r");
+            foreach (Race race in Race.races)
+            {
+                Console.WriteLine($"{index}. {race.name} ({race.desc})");
+                choices.Append($"{index}");
+                ++index;
+            }
+            Console.WriteLine("r. random\n>");
+            char rc = Utils.ReadKey(choices.ToString());
+            if (rc == 'r')
+                h.race = Race.GetRandom();
+            else
+                h.race = Race.races[rc - '1'];
+            Stats.Attribute prefered_attribute = h.ApplyRaceBonus(null).Value;
+
+            // class
+            Console.WriteLine("Pick class:");
+            index = 1;
+            choices.Clear();
+            foreach(Class clas in Class.classes)
+            {
+                Console.WriteLine($"{index}. {clas.name} ({clas.desc})");
+                choices.Append($"{index}");
+                ++index;
+            }
+            Console.WriteLine("r. random\n>");
+            rc = Utils.ReadKey(choices.ToString());
+            if (rc == 'r')
+                h.clas = Class.Get(prefered_attribute);
+            else
+                h.clas = Class.classes[rc - '1'];
+
+            h.PickAttribute();
+            heroes.Add(h);
+            return h;
         }
 
         void Init()

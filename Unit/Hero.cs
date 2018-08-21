@@ -17,6 +17,7 @@ namespace Genjiworlds
         public int id;
         public string name;
         public Race race;
+        public Class clas;
         public int level, exp, exp_need;
         public int str, dex, end;
         public int hp, hpmax;
@@ -26,7 +27,7 @@ namespace Genjiworlds
         public int age, kills;
         public int dungeon_level, lowest_level, target_level;
         public AiOrder ai_order;
-        public bool know_down_stairs, controlled, immortal, bowman;
+        public bool know_down_stairs, controlled, immortal;
         // temporary
         public UnitType killer;
         public bool gained_level;
@@ -53,26 +54,25 @@ namespace Genjiworlds
             this.id = id;
             level = 1;
             exp_need = 100;
-            bowman = Utils.Rand() % 3 == 0;
             gold = Utils.Random(30, 60);
             if (!custom)
             {
                 name = NameGenerator.GetName();
-                // start with 1 point in single attribute
-                switch (Utils.Rand() % 3)
+                race = Race.GetRandom();
+                Stats.Attribute attribute = ApplyRaceBonus(null).Value;
+                clas = Class.Get(attribute);
+                switch(clas.GetAttribute())
                 {
-                    case 0:
-                        str = 1;
+                    case Stats.Attribute.Strength:
+                        ++str;
                         break;
-                    case 1:
-                        dex = 1;
+                    case Stats.Attribute.Dexterity:
+                        ++dex;
                         break;
-                    case 2:
-                        end = 1;
+                    case Stats.Attribute.Endurance:
+                        ++end;
                         break;
                 }
-                race = Race.GetRandom();
-                ApplyRaceBonus(null);
                 BuyItems(false);
             }
             hp = hpmax = CalculateMaxHp();
@@ -120,6 +120,7 @@ namespace Genjiworlds
             f.Write(id);
             f.Write(name);
             f.Write((int)race.id);
+            f.Write((int)clas.id);
             f.Write(level);
             f.Write(exp);
             f.Write(str);
@@ -138,7 +139,6 @@ namespace Genjiworlds
             f.Write(target_level);
             f.Write(know_down_stairs);
             f.Write(immortal);
-            f.Write(bowman);
         }
 
         public void Load(BinaryReader f)
@@ -147,6 +147,8 @@ namespace Genjiworlds
             name = f.ReadString();
             RaceId race_id = (RaceId)f.ReadInt32();
             race = Race.Get(race_id);
+            ClassId class_id = (ClassId)f.ReadInt32();
+            clas = Class.Get(class_id);
             level = f.ReadInt32();
             exp = f.ReadInt32();
             exp_need = 100 * level;
@@ -167,7 +169,6 @@ namespace Genjiworlds
             target_level = f.ReadInt32();
             know_down_stairs = f.ReadBoolean();
             immortal = f.ReadBoolean();
-            bowman = f.ReadBoolean();
         }
 
         public string Location
@@ -183,7 +184,7 @@ namespace Genjiworlds
 
         public void ShowInfo()
         {
-            Console.WriteLine($"{name} [{id}] - inside {Location}, {race.name}, level:{level}, exp:{exp}/{exp_need}\n"
+            Console.WriteLine($"{name} [{id}] - inside {Location}, {race.name} {clas.name}, level:{level}, exp:{exp}/{exp_need}\n"
                 + $"Hp:{hp}/{hpmax}, str:{str}, dex:{dex}, end:{end}\n"
                 + $"Gold:{gold}, weapon:{Item.weapon_names[weapon]}, armor:{Item.armor_names[armor]}, bow:{Item.bow_names[bow]}, potions:{potions}\n"
                 + $"Age:{age}, kills:{kills}");
@@ -207,7 +208,7 @@ namespace Genjiworlds
             int lowest_item = Utils.Min(weapon, armor, bow);
             if (lowest_item < Item.max_item_level && gold >= Item.item_price[lowest_item])
             {
-                ItemType[] to_buy = GetBuyList();
+                ItemType[] to_buy = clas.item_choice;
                 for(int i=0; i<to_buy.Length; ++i)
                 {
                     switch(to_buy[i])
@@ -278,40 +279,6 @@ namespace Genjiworlds
             return bought_items.Count > 0;
         }
 
-        public ItemType[] GetBuyList()
-        {
-            ItemType[] to_buy = new ItemType[3];
-            if(bowman)
-            {
-                to_buy[0] = ItemType.Bow;
-                if(Utils.Rand() % 2 == 0)
-                {
-                    to_buy[1] = ItemType.Weapon;
-                    to_buy[2] = ItemType.Armor;
-                }
-                else
-                {
-                    to_buy[2] = ItemType.Armor;
-                    to_buy[1] = ItemType.Weapon;
-                }
-            }
-            else
-            {
-                if (Utils.Rand() % 2 == 0)
-                {
-                    to_buy[0] = ItemType.Weapon;
-                    to_buy[1] = ItemType.Armor;
-                }
-                else
-                {
-                    to_buy[0] = ItemType.Armor;
-                    to_buy[1] = ItemType.Weapon;
-                }
-                to_buy[2] = ItemType.Bow;
-            }
-            return to_buy;
-        }
-
         public int CalculateMaxHp()
         {
             return 8 + (level + end) * 2;
@@ -339,19 +306,19 @@ namespace Genjiworlds
                 gained_level = true;
             else
             {
-                switch (Utils.Rand() % 3)
+                switch (clas.GetAttribute())
                 {
-                    case 0:
+                    case Stats.Attribute.Strength:
                         ++str;
                         if (controller.CombatDetails)
                             controller.Notify($"{Name} increased strength.");
                         break;
-                    case 1:
+                    case Stats.Attribute.Dexterity:
                         ++dex;
                         if (controller.CombatDetails)
                             controller.Notify($"{Name} increased dexterity.");
                         break;
-                    case 2:
+                    case Stats.Attribute.Endurance:
                         ++end;
                         if (controller.CombatDetails)
                             controller.Notify($"{Name} increased endurance.");
@@ -407,33 +374,33 @@ namespace Genjiworlds
                 ai_order = AiOrder.Explore;
         }
 
-        public void ApplyRaceBonus(IUnitController controller)
+        public Stats.Attribute? ApplyRaceBonus(IUnitController controller)
         {
             if(level == 1 || level % 4 == 0)
             {
-                Race.Bonus bonus = race.bonus;
-                if (bonus == Race.Bonus.Random)
-                    bonus = (Race.Bonus)(Utils.Rand() % 3);
+                Stats.Attribute attribute = race.GetAttribute();
                 bool notify = controller?.CombatDetails ?? false;
-                switch (race.bonus)
+                switch (attribute)
                 {
-                    case Race.Bonus.Str:
+                    case Stats.Attribute.Strength:
                         ++str;
                         if(notify)
                             controller.Notify($"{Name} increased strength.");
                         break;
-                    case Race.Bonus.Dex:
+                    case Stats.Attribute.Dexterity:
                         ++dex;
                         if (notify)
                             controller.Notify($"{Name} increased dexterity.");
                         break;
-                    case Race.Bonus.End:
+                    case Stats.Attribute.Endurance:
                         ++end;
                         if (notify)
                             controller.Notify($"{Name} increased endurance.");
                         break;
                 }
+                return attribute;
             }
+            return null;
         }
     }
 }

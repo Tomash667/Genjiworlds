@@ -24,6 +24,22 @@ namespace Genjiworlds.Stats
         public string name, desc;
         public Bonus bonus;
 
+        public Attribute GetAttribute()
+        {
+            switch(bonus)
+            {
+                case Bonus.Str:
+                    return Attribute.Strength;
+                case Bonus.Dex:
+                    return Attribute.Dexterity;
+                case Bonus.End:
+                    return Attribute.Endurance;
+                case Bonus.Random:
+                default:
+                    return (Attribute)(Utils.Rand() % 3);
+            }
+        }
+
         public static Race[] races = new Race[]
         {
             new Race
